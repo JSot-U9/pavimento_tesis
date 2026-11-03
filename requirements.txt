@@ -1,0 +1,10 @@
+# Núcleo (Fase 2). Python 3.10+, Windows y Linux. No requiere internet en ejecución.
+numpy
+opencv-python
+scipy
+scikit-image
+# Pruebas
+pytest
+# Opcional: lectura REAL por ventanas de GeoTIFF y georreferenciación (sin él se usa OpenCV, con tope de tamaño)
+# rasterio
+# --- se incorporan en fases posteriores: pandas, SQLAlchemy, Pillow, matplotlib, reportlab, openpyxl ---
