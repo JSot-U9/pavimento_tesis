@@ -1,8 +1,8 @@
-# Guía de arquitectura (estado: Fase 2)
+# Guía de arquitectura (estado: Fase 4)
 
 Regla de capas del proyecto completo: `ui → logica_* → modelos/basedatos`; el **núcleo** (`app/nucleo/`) no conoce
 la BD ni la UI. Las vistas nunca importan modelos ni `nueva_sesion`; solo llaman a `logica_*`.
-**Hoy solo existe el núcleo y sus pruebas** (BD, lógica y UI llegan en F3–F6).
+**Hoy existen el núcleo, la BD, la capa `logica_*`, la interfaz y el procesamiento en segundo plano** (validación, estadística y reportes llegan en F5–F6).
 
 ## Núcleo (`app/nucleo/`)
 
@@ -47,5 +47,66 @@ esquina de la ventana) y medición solo dentro de `nucleo`. Se registra con `pip
 - **`ttkbootstrap` se elimina** (no está en las dependencias permitidas); se hará en F4.
 - La validación usará el **rectángulo de la ROI** como referencia (cobertura), no geometrías digitalizadas.
 
+## Capa de datos (F3)
+
+| Módulo | Responsabilidad |
+|---|---|
+| `modelos.py` | Esquema SQLAlchemy (17 tablas, ver F1); `Base.a_dict()` |
+| `basedatos.py` | `inicializar(ruta)`, `nueva_sesion()` (commit/rollback), versión de esquema (`PRAGMA user_version`), claves foráneas y SAVEPOINT activos |
+| `crs.py` | Conversión 4326 ↔ UTM WGS84 (Krüger) en Python puro |
+| `geovector.py` | Lectura de GeoJSON y GeoPackage (parser WKB propio): sin shapely/fiona/GDAL |
+| `logica_comun.py` | `Campo`/`validar` (todos los errores juntos), `ErrorValidacion`, lectura tolerante de CSV |
+| `logica_tramos.py` | Ficha 1, ortomosaico (tamaño/GSD/transformación/EPSG), eje de vía (px o mapa) |
+| `logica_fichas.py` | CRUD dirigido por esquema (`vuelo`, `condicion`, `gcp`, `catalogo`, `inspeccion`) y patologías con geometría y severidad |
+| `logica_roi.py` | ROI, progresivas desde el eje, reparto calibración/prueba estratificado y reproducible, solapes |
+| `logica_importacion.py` | ROI, eje, fichas y patologías desde CSV/GeoJSON/GPKG; `simular` y `estricto` |
+| `logica_deteccion.py` | `preparar_analisis` → `ejecutar_trabajo` (hilo) → `guardar_resultado`; consultas |
+| `logica_configuracion.py` | Parámetros base, tesela/margen, kappa mínimo, bandera `provisional` |
+
+Reglas: el hilo de trabajo no toca la BD; las sesiones no se anidan (SQLite en memoria comparte la conexión);
+los importadores usan `_crear*` con la sesión recibida y SAVEPOINT por fila.
+
+## Cambios respecto al plan de la F1
+- `lectura.py` ganó el atributo `epsg` (necesario para importar capas en otro CRS).
+- `CaracteristicaROI.valores` guarda los estadísticos en un JSON (R/G/B + textura) en vez de 20 columnas.
+- La ROI importada de un GPKG/GeoJSON se convierte a rectángulo; el polígono es solo registro.
+
+## Interfaz y segundo plano (F4)
+
+```
+main.py ─► basedatos.inicializar(ruta) ─► ui.ventana_principal.VentanaPrincipal
+ui/vista_*.py, panel_roi.py, dialogo_*.py   widgets (Tk/ttk)          ─┐ solo pintan y recogen texto crudo
+ui/presentadores/p_*.py                      lógica de UI SIN Tk       ─┤ llaman a logica_* (dicts) → Resultado
+app/tareas.py                                hilo + cola + Event       ─┘ sin Tk ni BD
+```
+
+| Módulo | Responsabilidad |
+|---|---|
+| `tareas.py` | `GestorTareas`: un hilo (`ejecutar_trabajo`), cola de `Mensaje` (inicio/progreso/resultado/cancelado/error/fin), `cancelar()` con `threading.Event`, `sondear()` sin bloqueo |
+| `ui/estilos.py` | tema `clam`, paleta neutra, estilos con nombre; `hacer_dpi_consciente()` (Windows) |
+| `ui/widgets.py` | `FormularioEsquema` (desde `esquema_*`; errores por campo + resumen con TODAS las líneas), `TablaTreeview`, `FrameDesplazable`, `Banner` |
+| `ui/dialogo_reporte.py` | `DialogoInforme`, `DialogoImportar`, `flujo_importacion` (vista previa `simular=True` → confirmar → importar) |
+| `ui/visor.py` | Canvas: miniatura + zona visible, zoom/pan, dibujo de ROI/eje/ventana, superposición de ROI, eje y detecciones, selección |
+| `ui/visor_modelo.py` | geometría del visor sin Tk: escala, región visible, conversiones, hit-test de detecciones |
+| `ui/imagen_visor.py` | `FuenteImagen` (miniatura y lectura decimada de zona) y `LectorAsincrono` (hilo del visor: solo lee imagen) |
+| `ui/presentadores/` | `base` (`Resultado`, `proteger`, `Contexto`), `formularios`, `informe`, `p_tramos`, `p_fichas`, `p_roi`, `p_analisis` |
+| `ui/vista_tramos.py`, `vista_fichas.py`, `vista_analisis.py`, `panel_roi.py`, `dialogo_parametros.py` | pestañas y paneles |
+
+Reglas verificadas por `tests/test_ui_capas.py` (AST): las vistas no importan `modelos`/`basedatos`/`sqlalchemy`; presentadores y
+modelo del visor no importan Tk; el núcleo y `logica_*` no importan la UI.
+
+### Flujo de un análisis
+```
+UI (principal)  PresentadorAnalisis.iniciar ─► logica_deteccion.preparar_analisis (lee BD) ─► GestorTareas.iniciar
+hilo "analisis" ejecutar_trabajo(trabajo, Event, progreso) ─► Mensaje en la cola     (no toca BD ni Tk)
+UI (principal)  after(100 ms) ─► sondear(): progreso → barra · resultado → guardar_resultado (BD) · cancelado/error → registrar_incidencia
+```
+`Contexto` (tramo activo + eventos `tramos`, `rois`, `eje`, `ortomosaico`, `ejecuciones`, `fichas`, `bd`) mantiene sincronizadas las pestañas.
+Las tablas (`TablaTreeview`) solo avisan cuando la selección difiere de la que la vista ya conoce (el evento de Tk es asíncrono).
+
+## Cambios respecto al plan de la F1 (F4)
+- `dialogo_reporte.py` se usa como informe de importación (aún no hay reportes). La cervecera no estaba disponible: los cuatro módulos reciclables se escribieron nuevos.
+- Se añadió `panel_roi.py`, `dialogo_parametros.py`, `visor_modelo.py`, `imagen_visor.py` y la carpeta `presentadores/` para poder probar la lógica de la UI sin pantalla.
+
 ## Pendiente
-`modelos.py`, `basedatos.py`, `logica_*`, `ui/`, `main.py`, `sun.py`, importadores, reportes (F3–F7).
+`logica_validacion`, `logica_estadistica` (F5); reportes y exportación (F6); `sun.py` (F7).

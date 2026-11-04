@@ -1,10 +1,19 @@
-# Núcleo (Fase 2). Python 3.10+, Windows y Linux. No requiere internet en ejecución.
+# Python 3.10+, Windows y Linux. No requiere internet en ejecución.
+# --- núcleo (Fase 2) ---
 numpy
 opencv-python
 scipy
 scikit-image
-# Pruebas
+# --- base de datos y lógica (Fase 3) ---
+SQLAlchemy>=2.0
+# --- interfaz (F4) ---
+# Tkinter viene con Python (Linux: sudo apt install python3-tk). Sin dependencias nuevas.
+# Pillow solo para scripts/captura_pantallas.py: pip install pillow
+# --- pruebas ---
 pytest
-# Opcional: lectura REAL por ventanas de GeoTIFF y georreferenciación (sin él se usa OpenCV, con tope de tamaño)
+# Opcional: lectura REAL por ventanas de GeoTIFF y georreferenciación (sin él se usa OpenCV, con tope de tamaño;
+# sin rasterio no hay georreferenciación y solo se pueden importar ROI/eje en píxeles)
 # rasterio
-# --- se incorporan en fases posteriores: pandas, SQLAlchemy, Pillow, matplotlib, reportlab, openpyxl ---
+# Solo para verificar las pruebas contra una implementación independiente (se omiten si no están):
+# pyproj
+# --- se incorporan en fases posteriores: pandas, Pillow, matplotlib, reportlab, openpyxl ---

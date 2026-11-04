@@ -7,6 +7,7 @@ Interfaz común de todos los lectores:
     lector.ancho, lector.alto          tamaño en píxeles
     lector.gsd_cm                      resolución (cm/px) si el archivo la trae (si no, None)
     lector.transformacion              geo.Transformacion si hay georreferenciación (si no, None)
+    lector.epsg                        código EPSG del CRS si se conoce (si no, None)
     lector.leer(x0, y0, x1, y1)        -> (rgb uint8 [h,w,3], nodata bool [h,w] | None)
     lector.cerrar()
 
@@ -56,12 +57,12 @@ def _recortar(x0, y0, x1, y1, ancho, alto):
 class LectorArray:
     """Lector sobre un arreglo RGB en memoria."""
 
-    def __init__(self, rgb, gsd_cm=None, nodata=None, transformacion=None):
+    def __init__(self, rgb, gsd_cm=None, nodata=None, transformacion=None, epsg=None):
         if rgb.ndim != 3 or rgb.shape[2] != 3:
             raise ValueError("El arreglo debe tener forma (alto, ancho, 3)")
         self._rgb, self._nodata = _a_uint8(rgb), nodata
         self.alto, self.ancho = rgb.shape[:2]
-        self.gsd_cm, self.transformacion = gsd_cm, transformacion
+        self.gsd_cm, self.transformacion, self.epsg = gsd_cm, transformacion, epsg
 
     def leer(self, x0, y0, x1, y1):
         x0, y0, x1, y1 = _recortar(x0, y0, x1, y1, self.ancho, self.alto)
@@ -99,7 +100,7 @@ class LectorOpenCV:
         rgb = cv2.cvtColor(_a_uint8(img), cv2.COLOR_BGR2RGB)
         self._lector = LectorArray(rgb, gsd_cm=gsd_cm, nodata=nodata)
         self.ancho, self.alto = self._lector.ancho, self._lector.alto
-        self.gsd_cm, self.transformacion = gsd_cm, None
+        self.gsd_cm, self.transformacion, self.epsg = gsd_cm, None, None
 
     def leer(self, x0, y0, x1, y1):
         return self._lector.leer(x0, y0, x1, y1)
@@ -126,6 +127,7 @@ class LectorRasterio:
         self.transformacion = None if afin.is_identity else Transformacion.desde_afin(afin)
         proyectado = self._ds.crs is not None and self._ds.crs.is_projected
         self.gsd_cm = abs(afin.a) * 100.0 if proyectado else None
+        self.epsg = self._ds.crs.to_epsg() if self._ds.crs is not None else None
 
     def leer(self, x0, y0, x1, y1):
         x0, y0, x1, y1 = _recortar(x0, y0, x1, y1, self.ancho, self.alto)
