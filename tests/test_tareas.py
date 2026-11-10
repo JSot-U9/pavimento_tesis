@@ -125,3 +125,27 @@ def test_tareas_no_importa_tk_ni_bd():
     prohibidos = ("tkinter", "sqlalchemy", "app.basedatos", "app.modelos", "app.logica_roi", "app.logica_tramos")
     assert not [m for m in mods if any(m == p or m.startswith(p + ".") for p in prohibidos)], mods
     assert "app.logica_deteccion" in mods
+
+
+def test_gestor_de_calculos_ejecuta_funciones_con_progreso_y_cancelacion():
+    from app.tareas import Calculo, gestor_de_calculos
+
+    def suma(cancelar, progreso):
+        progreso(0.5, "a medias")
+        return 42
+
+    g = gestor_de_calculos()
+    g.iniciar([Calculo("suma", suma)])
+    assert g.esperar(5)
+    tipos = [(m.tipo, m.resultado) for m in g.sondear()]
+    assert ("resultado", 42) in tipos and tipos[-1][0] == "fin" and any(t == "progreso" for t, _ in tipos)
+
+    def espera(cancelar, progreso):
+        from app.nucleo.estructuras import AnalisisCancelado
+        cancelar.wait(5)
+        raise AnalisisCancelado("x")
+
+    g.iniciar([Calculo("larga", espera)])
+    g.cancelar()
+    assert g.esperar(5)
+    assert [m.tipo for m in g.sondear()][-2:] == ["cancelado", "fin"]

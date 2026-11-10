@@ -39,6 +39,7 @@ class VistaAnalisis(ttk.Frame):
         ctx.suscribir("eje", lambda *_: self._pintar_eje())
         ctx.suscribir("ejecuciones", lambda *_: self._historial())
         ctx.suscribir("bd", lambda *_: self._cambio_tramo())
+        ctx.suscribir("params", lambda *_: self._params_info())     # F5: tras guardar parámetros calibrados
         self._cambio_tramo()
 
     # ---------------------------------------------------------------- construcción

@@ -41,6 +41,25 @@ class Mensaje:
     detalle: str = ""
 
 
+@dataclass
+class Calculo:
+    """Cálculo pesado genérico (F5: calibración, estadística). `funcion(cancelar, progreso) -> resultado`.
+    REGLA: la función corre en el hilo de trabajo, así que no puede usar Tk ni la BD: todo lo que lea de la BD
+    se prepara en el hilo principal antes de crear el Calculo (ver `logica_calibracion.preparar_calibracion`)."""
+    etiqueta: str
+    funcion: Callable[[Any, Callable], Any]
+
+
+def ejecutar_calculo(calculo, cancelar, progreso):
+    """Ejecutor para `GestorTareas(ejecutar=ejecutar_calculo)`: llama a la función del `Calculo`."""
+    return calculo.funcion(cancelar, progreso)
+
+
+def gestor_de_calculos() -> "GestorTareas":
+    """Gestor (hilo + cola + cancelación) para `Calculo`s, con los mismos mensajes que el de análisis."""
+    return GestorTareas(ejecutar=ejecutar_calculo)
+
+
 class GestorTareas:
     """Hilo de trabajo + cola. `ejecutar` es inyectable para las pruebas (por defecto, el núcleo real)."""
 

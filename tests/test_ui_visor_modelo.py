@@ -169,3 +169,10 @@ def test_lector_asincrono_informa_error_de_archivo(tmp_path):
         time.sleep(0.02)
     assert ev and ev[0][0] == "error" and "No existe" in ev[0][1]
     lector.cerrar()
+
+
+def test_zonas_poligono_aprox_se_tratan_como_poligono():
+    """Las zonas fusionadas entre teselas llevan geom_tipo 'poligono_aprox' (envolvente convexa)."""
+    z = _det(1, "piel_cocodrilo", "poligono_aprox", [(0, 0), (300, 0), (300, 300), (0, 300)])
+    assert vm.distancia_a_deteccion(z, 150, 150) == 0.0          # dentro del polígono, no «cerca de una línea»
+    assert vm.distancia_a_deteccion(z, 150, 400) == pytest.approx(100.0)

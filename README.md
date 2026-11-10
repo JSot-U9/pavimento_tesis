@@ -7,31 +7,31 @@ altoandinas mediante bandas RGB y procesamiento en Python* (UNSAAC, Cusco, 2026)
 > programa es solo orientativa. Los umbrales calibrados con imágenes sintéticas son **provisionales**
 > (ver `Params.provisionales()`): deben recalibrarse con los ortomosaicos reales antes de usarlos como evidencia.
 
-## Estado: Fase 4 de 7 (interfaz, visor y procesamiento en segundo plano)
+## Estado: Fase 6 de 7 (reportes, exportación a QGIS y pulido)
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | F1 | Plan, carpetas, esquema de BD | aprobada |
 | F2 | Núcleo: motor modular, lectura por ventanas, ancho corregido, eje de vía local | hecha |
 | F3 | Modelos de BD, `logica_*` de tramos/fichas/ROI/detección, importadores CSV/GeoJSON/GPKG | hecha |
-| **F4** | **UI Tkinter/ttk + visor por ventanas + procesamiento en segundo plano** | **hecha (este código)** |
-| F5 | Validación, calibración, estadística comparativa | pendiente |
-| F6 | Reportes PDF/XLSX/CSV, exportación a QGIS, pulido | pendiente |
+| F4 | UI Tkinter/ttk + visor por ventanas + procesamiento en segundo plano | hecha |
+| F5 | Validación (VP/FP/FN/VN), calibración de umbrales, estadística comparativa, gráficos | hecha |
+| **F6** | **Reportes PDF/XLSX/CSV, exportación a QGIS (GPKG/GeoJSON), respaldo, registro, empaquetado, manual** | **hecha (este código)** |
 | F7 | Algoritmo de Sun y comparación de métodos | pendiente |
 
-Ya existen `main.py`, la interfaz (`app/ui/`) y `app/tareas.py`. **Todavía no hay** validación, estadística, reportes, exportación a QGIS ni el método 'sun' (F5–F7).
+Ya existen `main.py`, la interfaz (`app/ui/`), `app/tareas.py`, `logica_validacion`, `logica_calibracion`, `logica_estadistica` y `graficos`. Desde la F6 también hay reportes, exportación a QGIS, respaldo y `MANUAL.md`. **Todavía no hay** el método 'sun' (F7).
 
 ## Instalación y pruebas
 
 ```
 pip install -r requirements.txt
-pytest                 # 186 con pantalla; sin pantalla se omiten 8 (las de widgets con Tk). ~1 min
-xvfb-run -a pytest     # Linux sin pantalla: ejecuta también las 8 pruebas de widgets
+pytest                 # 259 con pantalla; sin pantalla se omiten 10 (las de widgets con Tk). ~1 min
+xvfb-run -a pytest     # Linux sin pantalla: ejecuta también las 10 pruebas de widgets
 pytest -m lento        # además: vía de 100 000 x 2 000 px (~1 min), mide el pico de RAM
 python main.py [--bd RUTA]               # abre la aplicación (BD: --bd > $PAVIMENTO_BD > ./datos/pavimento.db)
 xvfb-run -a -s "-screen 0 1440x900x24" python scripts/captura_pantallas.py   # recorre la UI y guarda capturas/ (requiere Pillow)
 ```
-Requiere **Tkinter** (Windows: viene con Python; Linux: `sudo apt install python3-tk`). Pillow solo se usa en el script de capturas.
+Requiere **Tkinter** y matplotlib/pandas (F5) (Windows: viene con Python; Linux: `sudo apt install python3-tk`). Pillow solo se usa en el script de capturas.
 
 ## Uso de la aplicación (F4)
 
@@ -55,6 +55,55 @@ Medido con un GeoTIFF de 60 000 × 2 000 px: miniatura 1.7 s, zona 1:1 de 1200×
 `after` (100 ms) y, en el hilo principal, llama a `guardar_resultado` (o a `registrar_incidencia` si se canceló o falló).
 Cancelar usa `threading.Event`. «Todas las ROI de un rol» encadena varios trabajos; si se cancela, el que corre se detiene
 y los que esperaban se descartan. Los parámetros se editan en un diálogo con aviso PROVISIONAL y valen solo para la sesión.
+
+## Uso de la validación, calibración y estadística (F5)
+
+Pestañas **Validación** (sub-pestañas Validación · Referencias geométricas · Calibración) y **Estadística**; la lógica está en
+`app/logica_validacion.py`, `logica_calibracion.py`, `logica_estadistica.py` y los gráficos (`Figure` de matplotlib, reutilizables
+en el PDF de la F6) en `app/graficos.py`.
+
+```python
+from app import logica_validacion as lv, logica_calibracion as lc, logica_estadistica as le, logica_roi, logica_deteccion as ld
+logica_roi.asignar_roles("T1", 0.5, 42)            # calibración / prueba (estratificado, reproducible)
+ld.analizar_rois("T1")                              # una ejecución por ROI
+res = lv.evaluar("T1")                              # ROI de prueba; guarda en Validacion (idempotente)
+le.metricas_validacion(tramo="T1")                  # sens./esp./prec./exact. con IC de Wilson, F1 con IC bootstrap, kappa
+plan = lc.preparar_calibracion("T1")                # solo ROI de calibración (hilo principal: lee la BD)
+r = lc.ejecutar_calibracion(plan)                   # búsqueda (corre el motor; en la UI va en segundo plano). NO guarda
+lc.aplicar_calibracion(r, confirmar=True)           # único punto que llama a guardar_params_base(calibrado=True)
+```
+
+**Unidad de análisis = (ROI, tipo)**: para cada ROI de prueba y cada uno de los 4 tipos se asigna exactamente una celda
+VP/FP/FN/VN (vp+fp+fn+vn = 1).
+
+| | referencia de campo: el tipo **sí** está | el tipo **no** está |
+|---|---|---|
+| **detectado** | VP | FP |
+| **no detectado** | FN | VN |
+
+- *Referencia de campo*: `ROI.tipo_campo` (+ `Patologia.presencia`: si todas las fichas del tipo dicen «No hay», el tipo se
+  considera ausente; una ficha con presencia que equivalga a otro tipo lo añade). `'sano'` = ningún tipo presente.
+  Severidad oficial = `Severidad` vía `logica_fichas.severidades_roi`.
+- *Con `GeometriaReferencia`* (línea/polígono en px, pestaña «Referencias»): el `tipo_campo` de esa ROI se valida por **solape**
+  (Dice entre máscaras, líneas con tolerancia `tolerancia_ref_m`); Dice ≥ `umbral_solape` → VP, si no FN. Sin geometría:
+  presencia por ROI (método principal). Ambos umbrales están en `Configuracion` (`umbral_solape` 0.30, `tolerancia_ref_m` 0.10 m).
+- *Roles*: solo las ROI de **prueba** cuentan y se guardan; las de calibración solo se evalúan para calibrar (`guardar=True` con
+  `rol='calibracion'` es un error). Un solape calibración/prueba (`rois_solapados`) **bloquea** la validación y la calibración
+  (`solapes='advertir'` solo avisa).
+- *Casos límite*: ROI sin detección (FN o VN según la referencia), ROI `sano` (solo FP/VN), ROI sin ejecución que la cubra
+  (se omite y se avisa), **división por cero → `None`** (nunca 0), **n < 5 → se calcula el IC pero se advierte que no es fiable**.
+- *Estadística* (`logica_estadistica`): sensibilidad, especificidad, precisión y exactitud con IC 95 % de Wilson; F1 con IC
+  bootstrap por unidades; kappa de Cohen (presencia, tipo multiclase, severidad observador 1 vs 2 y campo vs Python, con
+  ponderación lineal) con el umbral `umbral_concordancia` de `Configuracion`; matrices de confusión; error de medidas contra
+  la Ficha 4 (sesgo, MAE, RMSE, Bland-Altman, Pearson/Spearman, t pareada o Wilcoxon según Shapiro); Tablas 2-4 (conteo,
+  longitud, ancho, área, % de área afectada por ROI y totales por tipo); McNemar entre dos conjuntos de ejecuciones validadas
+  (p. ej. 'actual' vs 'sun', o antes/después de calibrar); **comparación descriptiva entre tramos** (`comparacion_tramos`:
+  frecuencia, longitud/ancho/área con media, mín., máx. y DE, % de área afectada, frecuencias del tipo y la severidad de campo; sin
+  inferencia, como pide el plan de tesis 5.5) y la columna «Concordancia (%)» de la Ficha 7 (= exactitud × 100).
+- *Calibración*: búsqueda **por coordenadas** sobre una rejilla acotada (valor × {0.5…2}, recortado a `LIMITES`), objetivo F1 o
+  kappa (`objetivo_calibracion`); tope de pasadas y de evaluaciones; se muestra antes/después; **no guarda nada** hasta
+  `aplicar_calibracion(..., confirmar=True)`. Cada ejecución sigue guardando sus `Params` exactos.
+- Todo lo calculado con ejecuciones PROVISIONALES lleva `provisional=True` y el rótulo PROVISIONAL (tablas, avisos y gráficos).
 
 ## Uso del núcleo
 
@@ -145,6 +194,92 @@ motor anterior era de +2 a +4.5 mm (≈ 0.5–1 px).
 disparaba el callback tarde, borrando el formulario (p. ej. al dibujar una ROI). `TablaTreeview` compara ahora con la
 selección ya conocida (`widgets.py`; cubierto por `test_ui_humo.py`). No se modificó el núcleo ni `logica_*`.
 
+## Verificación de la F5
+| Criterio | Resultado |
+|---|---|
+| `pytest` completo | **259 pasan** con pantalla virtual (186 anteriores + 73 nuevas); sin pantalla: 248 pasan y 10 se omiten |
+| Wilson | igual a `statsmodels.proportion_confint(method='wilson')` (k=0, k=n, n=0, n pequeño; 95 y 99 %) |
+| Sens./espec./precisión/exactitud/F1 | iguales a `sklearn.metrics` sobre 200 casos aleatorios |
+| Kappa | = `cohen_kappa_score` (sin pesos, lineal y cuadrático); casos conocidos: **1** (acuerdo total), **0** (azar), **−1**; `None` si pe = 1 |
+| Matriz de confusión | = `sklearn.metrics.confusion_matrix` |
+| Bland-Altman | sesgo conocido (diferencias 1,2,3,2,1,3 → sesgo 2), DE y límites de acuerdo calculados a mano; IC del sesgo con t |
+| Pearson/Spearman/Shapiro/t/Wilcoxon | iguales a `scipy.stats`; Wilcoxon se elige solo si Shapiro rechaza normalidad |
+| McNemar | = `statsmodels.mcnemar` (exacto si b+c < 25, χ² con corrección en otro caso) |
+| VP/FP/FN/VN | casos forzados con ejecuciones y detecciones construidas a mano (cada celda, ROI `sano`, ROI sin detecciones) y de punta a punta con el motor real sobre la imagen sintética |
+| Solape por geometría | Dice = 1 (iguales), 0 (disjuntas), 0.5 (cuadrados desplazados la mitad); tolerancia y umbral configurables |
+| Calibración | búsqueda con óptimo conocido; con el motor real mejora F1 0.80 → 1.00 en las ROI de calibración; **verificado que jamás se corre el motor sobre una ROI de prueba** y que no se guarda nada sin confirmar |
+| UI | recorrido con xvfb: validar, errores de formulario, geometrías, estadística, comparación y calibración en segundo plano con confirmación; capturas `capturas/09…15` |
+| Capas | `test_ui_capas.py` sigue en verde con las vistas y presentadores nuevos; `tareas.py` sigue sin Tk ni BD |
+
+### Error encontrado y corregido en la F5 (código de la F4)
+El visor trataba como polígono solo `geom_tipo == "poligono"`, pero la fusión de zonas entre teselas emite `"poligono_aprox"`
+(envolvente convexa), que se dibujaba y seleccionaba como línea. Ahora se usa `startswith("poligono")` en `visor.py` y
+`visor_modelo.py`; prueba `test_zonas_poligono_aprox_se_tratan_como_poligono`. El núcleo y `logica_*` previos no cambiaron;
+solo se **añadieron** claves de `Configuracion` (`umbral_solape`, `tolerancia_ref_m`, `objetivo_calibracion`) y `app/tareas.py`
+ganó `Calculo`/`gestor_de_calculos` sin tocar `GestorTareas`.
+
+## Uso de reportes, exportación y respaldo (F6)
+Flujo completo en `MANUAL.md`; instalación y `.exe` en `INSTALACION.md`. Pestaña **Reportes**: PDF / Excel / CSV del tramo activo
+(vista previa antes de generar), exportación a GeoPackage/GeoJSON para QGIS y respaldo/restauración de la base de datos.
+Los tres tramos de la tesis (≈ 1.2 km) se registran como **T1, T2 y T3**. Los **falsos positivos se excluyen del conteo** de las
+Tablas 2-4 pero siguen registrados en `Validacion` y en las detecciones (`incluida_en_conteo`, `estado_validacion`).
+
+## Verificación de la F6
+| Criterio | Resultado |
+|---|---|
+| `pytest` completo | **353 pasan** con pantalla virtual (338 sin pantalla + 15 de UI que se omiten sin ella) |
+| PDF / XLSX / CSV | se regeneran y se **reabren** (PDF con texto extraíble, XLSX con openpyxl sin fórmulas rotas, CSV UTF-8 con BOM y variante `;`) |
+| GeoPackage | escrito con sqlite3 (sin GDAL) y releído con `leer_gpkg`, **pyogrio** y **geopandas**; CRS del ortomosaico; modo píxeles con srs_id −1 |
+| Conclusiones del reporte | plantillas con cifras calculadas; PROVISIONAL primero; sin validación no se emiten conclusiones de desempeño |
+| Respaldo | API de copia de SQLite; restauración deja `_antes_de_restaurar`; copia automática diaria con rotación solo de las automáticas |
+| UI | recorrido con xvfb y motor real; capturas `capturas/16…18`; `test_ui_capas.py` sigue en verde |
+| Empaquetado | `pyinstaller pavimento_tesis.spec` **compila en Linux** (carpeta de ≈ 500 MB) y el ejecutable abre y crea su registro bajo xvfb; **no probado en Windows** |
+
+### Error encontrado y corregido (código de la F5)
+La leyenda de la gráfica de métricas perdía series cuando la primera barra era «n/d» (usaba los manejadores de la primera serie).
+Ahora se construye con `Patch` y hay la prueba `test_leyenda_de_metricas_tiene_las_cuatro_aunque_la_primera_barra_sea_nd`.
+
+## Supuestos y límites conocidos (F6)
+- **Supuesto:** columnas de la Ficha 7 y de las Tablas 2-4 según el capítulo 3.2 leído del plan; confirmar con su asesor.
+- **Supuesto:** PDF con fuente Helvetica (WinAnsi); se sustituyen caracteres fuera de ese conjunto.
+- Solo se exportan CRS WGS84 y UTM WGS84 (EPSG 4326, 326xx, 327xx); otro EPSG se rechaza con un mensaje claro.
+- Sin georreferenciación solo se exporta en coordenadas de imagen (sin superposición en QGIS).
+- Nombres, ubicación y progresivas de T1-T3 son datos que usted debe cargar; el programa no los inventa.
+- Los datos siguen siendo sintéticos: **ninguna cifra de los reportes es evidencia** hasta calibrar con ortomosaicos reales.
+
+## Supuestos y límites conocidos (F5)
+- **Plan de tesis leído después de entregar la primera versión** (`PLAN_DE_TESIS_…FINALFINAL`): confirma que los indicadores de
+  detección son «Número detectado, Falsos positivos, Falsos negativos y Concordancia de detección (%)» (Ficha 7), que el análisis es
+  **descriptivo y comparativo entre los tres tramos «sin inferencias estadísticas que excedan el alcance»** (5.5) y que el kappa de
+  Cohen se menciona solo para la concordancia entre dos observadores (5.3). Por eso se añadió `comparacion_tramos` y la columna
+  «Concordancia (%)». Wilson, bootstrap, McNemar, Bland-Altman y t/Wilcoxon se mantienen porque se pidieron, pero **van más allá del
+  plan**: úselos como apoyo y consulte al asesor antes de ponerlos en el texto.
+- **Decisiones del tesista (8-nov-2026)**: (1) la concordancia de detección se presenta **en porcentaje** (se mantiene (VP+VN)/total ×100
+  por ROI y tipo); (2) **kappa mínimo aceptable = 0.60** (ya era el valor por defecto de `umbral_concordancia`); (3) **por ahora solo
+  se muestran los IC de Wilson**: McNemar, Bland-Altman, correlaciones, pruebas pareadas y el IC bootstrap del F1 siguen
+  calculándose en `logica_estadistica` pero la UI los oculta salvo activar «Mostrar pruebas avanzadas» (`Configuracion['estadistica_avanzada']`,
+  desactivado por defecto); (4) son **tres tramos de ≈ 1.2 km**; (5) **los FP/FN no entran al conteo por objeto pero se registran**:
+  se guardan en `Validacion` por ROI y tipo; no se agrega modo de conteo por objeto.
+- **Aún pendiente de confirmar con la tesis**: el plan no define la fórmula exacta de «Concordancia de detección (%)» (se asumió
+  (VP+VN)/total por ROI×tipo; el tesista indicó solo «por porcentaje»), y solo ubica ROI donde
+  el campo registró un deterioro (las ROI `sano` de la herramienta son una extensión). La Ficha 7 es una imagen sin texto en el
+  documento, así que sus columnas no se pudieron contrastar.
+- **SUPUESTO — unidad de análisis (ROI × tipo)** con una sola celda por unidad; una detección mal ubicada (Dice < umbral) cuenta
+  como FN y **no** como FP adicional. Con ROI rectangulares y presencia por ROI, VN/FP dependen de cuántos tipos se evalúan.
+- **SUPUESTO — tipo dominante de Python por ROI** (para la matriz de tipo): el tipo con más detecciones (empate: mayor área).
+- **SUPUESTO — severidad por ROI** = la peor registrada por observador / la peor entre las grietas de Python con ancho resoluble.
+  La severidad de Python es orientativa y solo existe para grietas lineales.
+- **SUPUESTO — pares de medidas**: se comparan solo ROI×tipo donde Python detectó el tipo y la Ficha 4 tiene el dato; longitud y
+  área se suman por ROI y tipo, el ancho es el promedio (bache: m → mm). Los no detectados ya cuentan como FN.
+- **SUPUESTO — % de área afectada** = Σ área detectada / área de las ROI analizadas (las regiones no deben solaparse).
+- **SUPUESTO — rejilla de calibración**: factores y `LIMITES` por parámetro son de ingeniería, no del plan de tesis; el ancho de
+  grieta no se calibra aquí (se afina con la Ficha 4). Con pocas ROI de calibración (< 5) el ajuste se advierte como sobreajustable.
+- Umbral de concordancia 0.60 (kappa), umbral de solape 0.30, tolerancia 0.10 m: valores por defecto **por confirmar con el asesor**.
+- IC de kappa: error estándar asintótico simple (solo sin ponderar); IC de F1: bootstrap percentil (2000 réplicas, semilla fija).
+- El cálculo estadístico es de milisegundos y corre en el hilo principal; solo la calibración (corre el motor) va por `tareas`.
+- Los datos son sintéticos: **ninguna cifra de la F5 es todavía evidencia**; todo se rotula PROVISIONAL hasta calibrar con datos reales.
+- Probado en Linux con xvfb y Python 3.12; no probado en Windows ni macOS.
+
 ## Supuestos y límites conocidos (F4)
 - **No llegaron adjuntos el plan de la F1 ni la cervecera**: `estilos.py`, `widgets.py`, `ventana_principal.py` y
   `dialogo_reporte.py` están escritos desde cero siguiendo lo pedido (ttk, tema `clam`, sin ttkbootstrap ni paleta de
@@ -154,7 +289,7 @@ selección ya conocida (`widgets.py`; cubierto por `test_ui_humo.py`). No se mod
   dependen de la BD (código no está en el catálogo, ROI de otro tramo, «tipo obligatorio» de la ROI) las comprueba la
   lógica en una etapa posterior. Los presentadores unen las etapas donde es posible (patología + geometría + severidad;
   tipo de ROI); el resto aparece tras corregir los formatos.
-- Los parámetros editados en el diálogo valen para la sesión; no se guardan como base (`guardar_params_base` queda para la F5).
+- Los parámetros editados en el diálogo valen para la sesión; solo la calibración confirmada (F5) los guarda como base.
 - Los nodata del ortomosaico se ven negros en el visor. Un TIFF de 1–2 bandas o sin 3 bandas RGB se rechaza con mensaje.
 - Sin rasterio, el visor usa el lector OpenCV del núcleo (decodifica la imagen completa; tope de 120 Mpx).
 - Botón central = desplazar; en macOS el botón central/derecho puede numerarse distinto (no probado en macOS).

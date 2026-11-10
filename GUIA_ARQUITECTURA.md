@@ -1,4 +1,4 @@
-# Guía de arquitectura (estado: Fase 4)
+# Guía de arquitectura (estado: Fase 6)
 
 Regla de capas del proyecto completo: `ui → logica_* → modelos/basedatos`; el **núcleo** (`app/nucleo/`) no conoce
 la BD ni la UI. Las vistas nunca importan modelos ni `nueva_sesion`; solo llaman a `logica_*`.
@@ -108,5 +108,55 @@ Las tablas (`TablaTreeview`) solo avisan cuando la selección difiere de la que 
 - `dialogo_reporte.py` se usa como informe de importación (aún no hay reportes). La cervecera no estaba disponible: los cuatro módulos reciclables se escribieron nuevos.
 - Se añadió `panel_roi.py`, `dialogo_parametros.py`, `visor_modelo.py`, `imagen_visor.py` y la carpeta `presentadores/` para poder probar la lógica de la UI sin pantalla.
 
+## Validación, calibración y estadística (F5)
+
+```
+ui/vista_validacion.py ─► p_validacion.py / p_calibracion.py ─► logica_validacion · logica_calibracion
+ui/vista_estadistica.py ─► p_estadistica.py ───────────────────► logica_estadistica ─► graficos (Figure, sin pyplot)
+```
+
+| Módulo | Responsabilidad |
+|---|---|
+| `logica_validacion.py` | `evaluar(tramo, ejecucion_ids, rol, …)` → filas VP/FP/FN/VN por (ROI, tipo), totales, `provisional`, advertencias; guarda en `Validacion` (solo prueba, idempotente); bloquea solapes calibración/prueba; CRUD de `GeometriaReferencia`; `grupos_validados` / `ejecuciones_validadas` (última ejecución por ROI); núcleo puro: `clasificar_unidad`, `evaluar_roi`, `solape_dice`, `tipos_presentes` |
+| `logica_calibracion.py` | `preparar_calibracion` (hilo principal, lee la BD → `PlanCalibracion`), `ejecutar_calibracion` (SIN BD: núcleo + cálculo puro, apta para el hilo de trabajo), `busqueda_coordenada` (pura, probada con óptimo conocido), `aplicar_calibracion(confirmar=True)` = único punto que llama a `guardar_params_base(calibrado=True)` |
+| `logica_estadistica.py` | funciones puras (`wilson`, `metricas_binarias`, `kappa`, `matriz_confusion`, `error_medidas`, `mcnemar`, `ic_f1_bootstrap`) y consultas (`metricas_validacion`, `concordancia_tipo`, `concordancia_severidad`, `error_de_medidas`, `tablas_conteo`, `comparar_ejecuciones`, `comparacion_tramos` descriptiva entre tramos) |
+| `graficos.py` | `fig_*` devuelven `matplotlib.figure.Figure` (sin pyplot): la UI las embebe y el PDF de la F6 las guardará con `savefig` |
+| `tareas.py` | además de `GestorTareas`: `Calculo(etiqueta, funcion(cancelar, progreso))`, `ejecutar_calculo`, `gestor_de_calculos()` |
+| `ui/widget_figura.py` | `VisorFigura` (`FigureCanvasTkAgg`, se adapta al hueco) |
+| `ui/presentadores/p_validacion.py`, `p_calibracion.py`, `p_estadistica.py` | lógica de las pestañas sin Tk |
+
+Reglas que se mantienen: la UI solo llama a `logica_*`; el hilo de trabajo no toca la BD (la calibración se **prepara** en el hilo
+principal y solo corre núcleo en el hilo); devolver `None` (no 0) ante división por cero; todo resultado con ejecuciones provisionales
+se rotula PROVISIONAL; `logica_estadistica` no depende de la UI (las funciones puras ni siquiera necesitan la BD).
+`Contexto` gana los eventos `validacion` (nueva validación guardada) y `params` (parámetros base calibrados guardados).
+`Configuracion` gana `umbral_solape`, `tolerancia_ref_m`, `objetivo_calibracion` y `estadistica_avanzada` (la UI oculta McNemar, Bland-Altman, correlaciones, pruebas pareadas y el IC bootstrap del F1 salvo que sea True; la lógica los calcula siempre).
+
+### Flujo de una calibración
+```
+UI (principal)  PresentadorCalibracion.iniciar ─► logica_calibracion.preparar_calibracion (lee BD, solo ROI de calibración)
+                                                 ─► gestor_de_calculos().iniciar([Calculo(ejecutar_calibracion)])
+hilo            búsqueda por coordenadas: por candidato, ejecutar_trabajo en cada ROI de calibración (sin BD)
+UI (principal)  sondear(): progreso · resultado (antes/después) ─► el usuario confirma ─► aplicar_calibracion ─► guardar_params_base(calibrado=True)
+```
+
+## Cambios respecto al plan de la F1 (F5)
+- Validación por unidad (ROI, tipo) con presencia por ROI como método principal; la geometría de referencia es opcional (Dice con tolerancia).
+- Tres claves nuevas en `Configuracion`; el esquema de BD (v1) no cambia: `Validacion` y `GeometriaReferencia` ya existían.
+- Corrección de la F4: el visor trata `poligono_aprox` como polígono (ver README).
+
+## Reportes, exportación y respaldo (F6)
+- `logica_reportes.recopilar(...)` junta todo en un único dict `datos` (lee la BD, **hilo principal**); `reportes_tablas.py` es la única
+  fuente de columnas y filas; `reportes_pdf.py` (reportlab + figuras de `graficos.py`) y `reportes_xlsx.py` (openpyxl) solo escriben.
+  `escribir_reportes(datos, ...)` no toca BD ni Tk y corre en `tareas.gestor_de_calculos()` mediante `Calculo`.
+- `logica_estadistica.tablas_conteo(..., excluir_fp=True)` filtra las detecciones de unidades FP del conteo sin borrarlas.
+- `logica_exportacion.py`: GPKG con sqlite3 (OGC 12-128r18, WKB little endian, cabecera GP con envolvente, WKT1 UTM); GeoJSON; `verificar_gpkg` relee con `leer_gpkg`.
+- `logica_respaldo.py` (API de respaldo de SQLite, copia diaria, rotación, restauración con copia previa), `registro.py` (RotatingFileHandler 1 MB × 5,
+  excepthooks, env `PAVIMENTO_LOG`), `errores.py` (mensajes amigables), `main.py` los une.
+- Capas: `ui/vista_reportes.py` → `ui/presentadores/p_reportes.py` → `logica_*`. Vistas y presentadores no importan modelos ni sqlalchemy (`test_ui_capas.py`).
+- Claves nuevas en `Configuracion`: `respaldo_automatico`, `respaldos_a_conservar`. El esquema de BD no cambia.
+
+## Cambios respecto al plan de la F1 (F6)
+- Corrección de la F5: leyenda de la gráfica de métricas (ver README). El núcleo no cambió.
+
 ## Pendiente
-`logica_validacion`, `logica_estadistica` (F5); reportes y exportación (F6); `sun.py` (F7).
+Método `sun.py` y su comparación (F7).

@@ -180,7 +180,7 @@ def distancia_a_deteccion(det: dict, x: float, y: float) -> float:
     x0, y0, x1, y1 = det["bbox"]
     if det.get("geom_tipo") == "polilinea_aprox" and len(geom) >= 2:
         return min(dist_punto_segmento(x, y, *geom[i], *geom[i + 1]) for i in range(len(geom) - 1))
-    if det.get("geom_tipo") == "poligono" and len(geom) >= 3:
+    if (det.get("geom_tipo") or "").startswith("poligono") and len(geom) >= 3:
         if punto_en_poligono(x, y, geom):
             return 0.0
         return min(dist_punto_segmento(x, y, *geom[i], *geom[(i + 1) % len(geom)]) for i in range(len(geom)))

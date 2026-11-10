@@ -8,6 +8,8 @@ Diálogos modales de informe:
     DialogoImportar     pide archivo y opciones de una importación.
     DialogoTexto        muestra un texto largo (p. ej. el reparto de roles).
     flujo_importacion   vista previa (simular=True) -> confirmar -> importar de verdad.
+    DialogoVistaPrevia  (F6) qué contendrá un reporte, conclusiones y advertencias antes de generarlo.
+    abrir_en_sistema    (F6) abre un archivo o carpeta con el programa predeterminado.
 """
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -149,3 +151,50 @@ def flujo_importacion(master, titulo, tipos_archivo, opciones, ejecutar: Callabl
         return None
     DialogoInforme(master, fin.datos).abrir()
     return fin.datos
+
+
+# ===================================================================================== F6: reportes
+class DialogoVistaPrevia(_Modal):
+    """Qué contendrá el reporte (selección de ejecuciones, validación, fichas), las conclusiones que se van a emitir
+    (solo cifras calculadas) y las advertencias. «Generar» devuelve True."""
+
+    def __init__(self, master, texto, conclusiones, advertencias, formatos_txt):
+        super().__init__(master, "Vista previa del reporte", 760, 600)
+        marco = ttk.Frame(self, padding=12)
+        marco.pack(fill="both", expand=True)
+        ttk.Label(marco, text="Vista previa del reporte", style="Titulo.TLabel").pack(anchor="w")
+        ttk.Label(marco, text=texto, justify="left", wraplength=720).pack(anchor="w", pady=(6, 8))
+        ttk.Label(marco, text=f"Se generará: {formatos_txt}", style="Suave.TLabel").pack(anchor="w")
+        nb = ttk.Notebook(marco)
+        nb.pack(fill="both", expand=True, pady=8)
+        for titulo, lineas in ((f"Conclusiones ({len(conclusiones)})", conclusiones),
+                               (f"Advertencias ({len(advertencias)})", advertencias)):
+            caja = tk.Text(nb, wrap="word", relief="flat", background="#ffffff", padx=8, pady=6, height=10)
+            caja.insert("1.0", "\n\n".join("• " + x for x in lineas) if lineas else "Sin elementos.")
+            caja.configure(state="disabled")
+            nb.add(caja, text=titulo)
+        pie = ttk.Frame(marco)
+        pie.pack(fill="x")
+        ttk.Button(pie, text="Generar", style="Accion.TButton", command=self._ok).pack(side="right")
+        ttk.Button(pie, text="Cancelar", command=self.destroy).pack(side="right", padx=6)
+
+    def _ok(self):
+        self.resultado = True
+        self.destroy()
+
+
+def abrir_en_sistema(ruta):
+    """Abre un archivo o carpeta con el programa predeterminado (Windows, macOS, Linux). False si no se pudo."""
+    import os
+    import subprocess
+    import sys
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(ruta)                                   # noqa: S606 - ruta que generó el programa
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", ruta])
+        else:
+            subprocess.Popen(["xdg-open", ruta], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except (OSError, AttributeError):
+        return False

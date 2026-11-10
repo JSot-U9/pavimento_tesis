@@ -444,7 +444,7 @@ class VisorOrtomosaico(ttk.Frame):
             x1, y1 = m.imagen_a_pantalla(d["bbox"][2], d["bbox"][3])
             c.create_rectangle(x0 - 4, y0 - 4, x1 + 4, y1 + 4, outline=estilos.COLOR_SELECCION, dash=(4, 3), width=1,
                                tags="ovl")
-        if d.get("geom_tipo") == "poligono" and len(flat) >= 6:
+        if (d.get("geom_tipo") or "").startswith("poligono") and len(flat) >= 6:
             c.create_polygon(*flat, outline=col, fill="", width=ancho, tags="ovl")
         elif len(flat) >= 4:
             c.create_line(*flat, fill=col, width=ancho, tags="ovl")

@@ -9,6 +9,9 @@ SQLAlchemy>=2.0
 # --- interfaz (F4) ---
 # Tkinter viene con Python (Linux: sudo apt install python3-tk). Sin dependencias nuevas.
 # Pillow solo para scripts/captura_pantallas.py: pip install pillow
+# --- estadística y gráficos (F5) ---
+pandas
+matplotlib
 # --- pruebas ---
 pytest
 # Opcional: lectura REAL por ventanas de GeoTIFF y georreferenciación (sin él se usa OpenCV, con tope de tamaño;
@@ -16,4 +19,16 @@ pytest
 # rasterio
 # Solo para verificar las pruebas contra una implementación independiente (se omiten si no están):
 # pyproj
-# --- se incorporan en fases posteriores: pandas, Pillow, matplotlib, reportlab, openpyxl ---
+# geopandas
+# pyogrio
+# F5: estas dos solo sirven para verificar las métricas contra una implementación independiente (si faltan, esas pruebas
+# se omiten):
+scikit-learn
+statsmodels
+# --- reportes y exportación (F6) ---
+reportlab
+openpyxl
+# Solo para verificar en las pruebas que el GeoPackage/GeoJSON exportado lo lee software externo (se omiten si faltan):
+# pypdf (leer el texto de los PDF generados), geopandas + pyogrio (releer el GPKG)
+pypdf
+# --- se incorporan en F7: (ninguna librería nueva prevista) ---
