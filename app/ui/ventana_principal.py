@@ -5,7 +5,7 @@ Ventana principal (Tk + ttk, tema clam): selector de tramo activo, pestañas Tra
 de estado. Sin login. Las pestañas comparten un `Contexto` (tramo activo y eventos de cambio).
 
 F5 añade las pestañas Validación (con referencias geométricas y calibración) y Estadística; F6, la pestaña Reportes
-(PDF/XLSX/CSV, exportación a QGIS, respaldo de la BD). Falta para F7 el método 'sun'.
+(PDF/XLSX/CSV, exportación a QGIS, respaldo de la BD). F7 añade la pestaña Métodos (comparación 'actual' vs 'sun').
 """
 import logging
 import os
@@ -18,6 +18,7 @@ from app.ui import estilos
 from app.ui.presentadores.base import Contexto
 from app.ui.presentadores.p_tramos import PresentadorTramos
 from app.ui.vista_analisis import VistaAnalisis
+from app.ui.vista_comparacion import VistaComparacion
 from app.ui.vista_estadistica import VistaEstadistica
 from app.ui.vista_fichas import VistaFichas
 from app.ui.vista_reportes import VistaReportes
@@ -30,7 +31,7 @@ TITULO = "Detección de deterioros en pavimentos flexibles"
 
 class VentanaPrincipal(tk.Tk):
     def __init__(self, ruta_bd="", abrir_bd: Optional[Callable[[str], str]] = None, gestor=None, geometria="1360x820",
-                 gestor_calculos=None, gestor_reportes=None):
+                 gestor_calculos=None, gestor_reportes=None, gestor_metodos=None):
         super().__init__()
         self.ruta_bd, self._abrir_bd = ruta_bd, abrir_bd
         self.ctx = Contexto()
@@ -41,7 +42,7 @@ class VentanaPrincipal(tk.Tk):
         self._tramos = PresentadorTramos(self.ctx)
         self._ids = []
         self._construir_menu()
-        self._construir(gestor, gestor_calculos, gestor_reportes)
+        self._construir(gestor, gestor_calculos, gestor_reportes, gestor_metodos)
         self.protocol("WM_DELETE_WINDOW", self.cerrar)
         self.report_callback_exception = self._excepcion
         self.ctx.suscribir("tramos", lambda *_: self._cargar_tramos())
@@ -63,7 +64,7 @@ class VentanaPrincipal(tk.Tk):
         m.add_cascade(label="Ayuda", menu=h)
         self.configure(menu=m)
 
-    def _construir(self, gestor, gestor_calculos=None, gestor_calculos_reportes=None):
+    def _construir(self, gestor, gestor_calculos=None, gestor_calculos_reportes=None, gestor_metodos=None):
         top = ttk.Frame(self, padding=(10, 8, 10, 0))
         top.pack(fill="x")
         ttk.Label(top, text="Tramo activo", style="Subtitulo.TLabel").pack(side="left")
@@ -86,6 +87,8 @@ class VentanaPrincipal(tk.Tk):
         self.nb.add(self.v_analisis, text="Análisis")
         self.nb.add(self.v_validacion, text="Validación")
         self.nb.add(self.v_estadistica, text="Estadística")
+        self.v_metodos = VistaComparacion(self.nb, self.ctx, gestor_metodos)
+        self.nb.add(self.v_metodos, text="Métodos")
         self.nb.add(self.v_reportes, text="Reportes")
         self.estado = ttk.Label(self, text="", style="Estado.TLabel", anchor="w")
         self.estado.pack(fill="x", side="bottom")
@@ -119,7 +122,7 @@ class VentanaPrincipal(tk.Tk):
         self.nb.select(self.v_reportes)
 
     def _ocupado(self):
-        return self.v_analisis.pres.ocupado or self.v_validacion.pc.ocupado or self.v_reportes.pres.ocupado
+        return self.v_analisis.pres.ocupado or self.v_validacion.pc.ocupado or self.v_reportes.pres.ocupado or self.v_metodos.pres.ocupado
 
     def ir_a_visor(self, modo="mover"):
         self.nb.select(self.v_analisis)
@@ -149,7 +152,7 @@ class VentanaPrincipal(tk.Tk):
 
     def acerca(self):
         messagebox.showinfo(
-            "Acerca de", f"{TITULO}\n\nTesis UNSAAC, Cusco, 2026.\nVersión: Fase 6 de 7.\n\n"
+            "Acerca de", f"{TITULO}\n\nTesis UNSAAC, Cusco, 2026.\nVersión: Fase 7 de 7.\n\n"
             "Los umbrales del motor son PROVISIONALES (calibrados con imágenes sintéticas).\n"
             "La severidad oficial es la de la ficha de campo.", parent=self)
 
@@ -159,6 +162,7 @@ class VentanaPrincipal(tk.Tk):
                 "Salir", "Hay un análisis, una calibración o un reporte en curso. ¿Cancelarlo y salir?", parent=self):
             return
         try:
+            self.v_metodos.cerrar()
             self.v_reportes.cerrar()
             self.v_validacion.cerrar()
             self.v_analisis.cerrar()

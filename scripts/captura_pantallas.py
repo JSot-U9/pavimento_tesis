@@ -77,6 +77,7 @@ def main(salida):
     dlg.destroy()
     _fase5(v, a, out, salida)
     _fase6(v, out, salida, tmp)
+    _fase7(v, out, salida)
     v.cerrar()
     return out
 
@@ -190,6 +191,21 @@ def _fase6(v, out, salida, tmp):
             out.append(os.path.join(salida, "18_informe_pdf-*.png"))
         except (OSError, subprocess.CalledProcessError):
             pass
+
+
+def _fase7(v, out, salida):
+    """F7: pestaña Métodos: analiza y valida con 'actual' y 'sun' sobre las ROI de prueba y compara."""
+    from app import logica_roi as lr
+    rois = {x["codigo"]: x for x in lr.listar_rois(v.ctx.tramo_id)}
+    for c in ("R02", "R04", "R05"):
+        lr.cambiar_rol(rois[c]["id"], "prueba")
+    vm = v.v_metodos
+    v.nb.select(vm)
+    v.update()
+    vm.ejecutar()
+    h.esperar(v, lambda: not vm.pres.ocupado and vm._sondeo is None, 180)
+    v.update()
+    out.append(h.captura(v, os.path.join(salida, "19_metodos_comparacion.png")))
 
 
 if __name__ == "__main__":

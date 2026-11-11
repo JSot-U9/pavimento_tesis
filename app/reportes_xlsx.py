@@ -36,6 +36,10 @@ HOJAS = (  # (nombre de hoja, tabla, nota)
     ("Ficha 9 GCP", "gcps", ""),
     ("Fichas 2-4 Patologías", "patologias", "Severidad oficial (F3) y medidas de campo (F4) por patología."),
     ("Comparación tramos", "comparacion_tramos", "Comparación DESCRIPTIVA entre tramos, sin inferencia estadística."),
+    ("Métodos Métricas", "metodos_metricas", "Mismas ROI de prueba y mismos Params base; solo los tipos que ambos métodos detectan."),
+    ("Métodos McNemar", "metodos_mcnemar", "A = primer método, B = segundo. Acierto de una unidad (ROI × tipo) = VP o VN."),
+    ("Métodos Medidas", "metodos_medidas", "Pares (ROI, tipo) detectados por ambos. Sesgo = B − A; Bland-Altman con n ≥ 3."),
+    ("Métodos Rendimiento", "metodos_rendimiento", "RAM = aumento aproximado del RSS del proceso durante el análisis."),
 )
 
 
@@ -147,6 +151,8 @@ def escribir_xlsx(datos, ruta):
         if tabla in ("validacion", "metricas", "concordancia", "medidas", "pares_medidas") and not datos["meta"]["validado"]:
             continue
         if tabla == "comparacion_tramos" and not datos.get("comparacion"):
+            continue
+        if tabla.startswith("metodos_") and not datos.get("comparacion_metodos"):
             continue
         if set(nombre) & INVALIDOS:
             raise ValueError(f"nombre de hoja inválido: {nombre}")

@@ -31,4 +31,4 @@ openpyxl
 # Solo para verificar en las pruebas que el GeoPackage/GeoJSON exportado lo lee software externo (se omiten si faltan):
 # pypdf (leer el texto de los PDF generados), geopandas + pyogrio (releer el GPKG)
 pypdf
-# --- se incorporan en F7: (ninguna librería nueva prevista) ---
+# --- F7: ninguna librería nueva (sun.py usa numpy, scipy, opencv y scikit-image ya listados) ---

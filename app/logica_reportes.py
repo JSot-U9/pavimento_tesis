@@ -190,7 +190,7 @@ def _longitud_eje(vertices):
 
 
 def recopilar(tramo, ejecucion_ids=None, metodo="actual", rol="prueba", excluir_fp=True, con_comparacion=True,
-              titulo=None, autor=None, institucion=None):
+              titulo=None, autor=None, institucion=None, con_metodos=True):
     """Lee la BD y devuelve `datos` (ver el módulo). Lanza ErrorValidacion si el tramo no tiene ejecuciones."""
     omit: Dict[str, str] = {}
     t = lt.obtener_tramo(tramo)
@@ -231,7 +231,7 @@ def recopilar(tramo, ejecucion_ids=None, metodo="actual", rol="prueba", excluir_
         "fichas": _fichas(codigo, rois_por_id),
         "validacion": {"filas": filas_val, "metricas": None, "concordancia_tipo": None, "concordancia_severidad": None,
                        "medidas": None},
-        "tablas": None, "comparacion": None, "advertencias": list(sel["advertencias"]),
+        "tablas": None, "comparacion": None, "comparacion_metodos": None, "advertencias": list(sel["advertencias"]),
     }
     datos["gcp_resumen"] = _resumen_gcp(datos["gcps"])
     datos["detecciones"] = _detecciones(ids, rois_por_id, estados, excluir_fp)
@@ -250,6 +250,10 @@ def recopilar(tramo, ejecucion_ids=None, metodo="actual", rol="prueba", excluir_
             comp = _intentar(omit, "comparacion_tramos", le.comparacion_tramos, None, metodo, rol)
             if comp and len(comp["tramos"]) >= 2:
                 datos["comparacion"] = comp
+        if con_metodos:                                  # F7: solo si hay validación de ambos métodos en el tramo
+            comp = _comparacion_metodos(codigo, rol)
+            if comp:
+                datos["comparacion_metodos"] = comp
     else:
         omit["validacion"] = "no hay validación guardada para esta selección"
 
@@ -264,6 +268,15 @@ def recopilar(tramo, ejecucion_ids=None, metodo="actual", rol="prueba", excluir_
     datos["advertencias"] += _advertencias_datos(datos)
     datos["conclusiones"] = conclusiones(datos)
     return datos
+
+
+def _comparacion_metodos(codigo, rol, a="actual", b="sun"):
+    """Comparación 'actual' vs 'sun' si ambos tienen validación en el tramo; si no, None (sin ruido en el reporte)."""
+    from app import logica_comparacion as lc
+    try:
+        return lc.comparar_metodos(codigo, a, b, rol)
+    except ErrorValidacion:
+        return None
 
 
 def _advertencias_datos(d):
@@ -344,6 +357,10 @@ def conclusiones(d):
             if e and e["n"]:
                 out.append(f"Error de {nombre} frente a la Ficha 4 (n = {e['n']}): sesgo {_num(e['sesgo'], 3, u)}, "
                            f"MAE {_num(e['mae'], 3, u)}, RMSE {_num(e['rmse'], 3, u)}.")
+    cm = d.get("comparacion_metodos")
+    if cm:
+        out.append("Comparación de métodos (ver sección 6):")
+        out += [t for t in cm["conclusiones"] if not t.startswith("PROVISIONAL")]
     return out
 
 

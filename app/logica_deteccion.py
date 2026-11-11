@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 
 from app import basedatos, logica_configuracion, logica_tramos
 from app.logica_comun import ErrorNoEncontrado, ErrorValidacion, obtener
-from app.modelos import (ROI, CaracteristicaROI, Deteccion, EjecucionAnalisis)
+from app.modelos import (ROI, CaracteristicaROI, Deteccion, EjecucionAnalisis, RendimientoEjecucion)
 from app.nucleo import pipeline
 from app.nucleo.calidad import mascara_valida
 from app.nucleo.caracteristicas import caracteristicas_region
@@ -30,6 +30,7 @@ from app.nucleo.estructuras import AnalisisCancelado, ResultadoAnalisis
 from app.nucleo.geo import Transformacion
 from app.nucleo.lectura import abrir
 from app.nucleo.parametros import Params
+from app.rendimiento import MedidorPico
 
 MAX_PX_CARACTERISTICAS = 40_000_000          # por encima, no se calculan estadísticos RGB/GLCM de la ROI
 
@@ -63,6 +64,7 @@ class ResultadoTrabajo:
     duracion_s: float
     caracteristicas: Optional[dict] = None
     advertencias: List[str] = field(default_factory=list)
+    ram: Optional[tuple] = None            # (base_mb, pico_mb, adicional_mb) medidos durante el análisis (F7)
 
 
 # ------------------------------------------------------------------------------------ 1. preparar
@@ -92,14 +94,14 @@ def preparar_analisis(tramo, roi_id=None, region=None, metodo="actual", params=N
         else:
             reg, alcance = (0, 0, ancho, alto), "tramo"
     base = params if params is not None else logica_configuracion.params_base()
-    p = base.con(gsd_cm=gsd)
+    p = base.migrar().con(gsd_cm=gsd)
     e = logica_tramos.obtener_eje(tid)
     eje = None if e is None else {"vertices_px": e["vertices_px"], "gsd_m": p.gsd_m,
                                   "progresiva_inicial_m": e["progresiva_inicial_m"], "ventana_m": p.eje_ventana_m}
     return Trabajo(tramo_id=tid, ruta=ruta, region=reg, alcance=alcance, params=p, metodo=metodo, roi_id=roi_id,
                    roi_codigo=rcod, eje=eje, transformacion=tr, tesela_px=int(logica_configuracion.obtener("tesela_px")),
                    margen_m=float(logica_configuracion.obtener("margen_m")),
-                   provisional=logica_configuracion.es_provisional(p),
+                   provisional=logica_configuracion.es_provisional(p, metodo),
                    caracteristicas=caracteristicas and alcance == "roi")
 
 
@@ -107,6 +109,7 @@ def preparar_analisis(tramo, roi_id=None, region=None, metodo="actual", params=N
 def ejecutar_trabajo(trabajo, cancelar=None, progreso=None):
     """Corre el núcleo. NO toca la BD: se puede llamar desde un hilo. Lanza AnalisisCancelado si se cancela."""
     t0 = time.perf_counter()
+    medidor = MedidorPico().__enter__()
     lector = abrir(trabajo.ruta, gsd_cm=trabajo.params.gsd_cm)
     try:
         eje = EjeNucleo.desde_dict(trabajo.eje) if trabajo.eje else None
@@ -123,8 +126,11 @@ def ejecutar_trabajo(trabajo, cancelar=None, progreso=None):
                     raise AnalisisCancelado("Análisis cancelado por el usuario")
                 carac = caracteristicas_region(lector, res.region,
                                                lambda rgb, nd: mascara_valida(rgb, trabajo.params, nd))
-        return ResultadoTrabajo(res, time.perf_counter() - t0, carac, adv)
+        medidor.__exit__(None, None, None)
+        return ResultadoTrabajo(res, time.perf_counter() - t0, carac, adv,
+                                (medidor.base_mb, medidor.pico_mb, medidor.adicional_mb))
     finally:
+        medidor.__exit__(None, None, None)
         lector.cerrar()
 
 
@@ -199,6 +205,9 @@ def guardar_resultado(trabajo, resultado):
                 severidad_prelim=d.severidad_prelim, metodo_ancho=d.metodo_ancho or None,
                 advertencia=d.advertencia or None, metodo=d.metodo))
         s.add_all(filas)
+        if resultado.ram is not None and resultado.ram[1] is not None:
+            s.add(RendimientoEjecucion(ejecucion_id=e.id, ram_base_mb=_py(resultado.ram[0]),
+                                       ram_pico_mb=_py(resultado.ram[1]), ram_adicional_mb=_py(resultado.ram[2])))
         if resultado.caracteristicas is not None:
             s.add(CaracteristicaROI(ejecucion_id=e.id, roi_id=trabajo.roi_id, valores=_py(resultado.caracteristicas)))
         s.flush()
@@ -264,6 +273,20 @@ def listar_ejecuciones(tramo, roi_id=None, estado=None):
 def obtener_ejecucion(ejecucion_id):
     with basedatos.nueva_sesion() as s:
         return obtener(s, EjecucionAnalisis, ejecucion_id, "ejecución").a_dict()
+
+
+def rendimiento_de(ejecucion_ids):
+    """{ejecucion_id: {'duracion_s', 'mpx', 'ram_base_mb', 'ram_pico_mb', 'ram_adicional_mb', 'metodo'}} (F7).
+    La RAM es None en ejecuciones anteriores a la F7 o en sistemas donde no se pudo medir."""
+    ids = [int(i) for i in ejecucion_ids]
+    out = {}
+    with basedatos.nueva_sesion() as s:
+        for e in s.scalars(select(EjecucionAnalisis).where(EjecucionAnalisis.id.in_(ids))):
+            r = s.get(RendimientoEjecucion, e.id)
+            out[e.id] = {"metodo": e.metodo, "duracion_s": e.duracion_s, "mpx": (e.x1 - e.x0) * (e.y1 - e.y0) / 1e6,
+                         "ram_base_mb": r.ram_base_mb if r else None, "ram_pico_mb": r.ram_pico_mb if r else None,
+                         "ram_adicional_mb": r.ram_adicional_mb if r else None}
+    return out
 
 
 def parametros_de_ejecucion(ejecucion_id):

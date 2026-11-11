@@ -14,7 +14,7 @@ Los tres tramos de la tesis (≈ 1.2 km cada uno) se registran con los códigos 
 ## El flujo completo
 
 ```
-1 Tramo ─► 2 Ortomosaico ─► 3 Eje de vía ─► 4 ROI ─► 5 Fichas ─► 6 Análisis ─► 7 Validación ─► 8 Reportes
+1 Tramo ─► 2 Ortomosaico ─► 3 Eje de vía ─► 4 ROI ─► 5 Fichas ─► 6 Análisis ─► 7 Validación ─► 8 Métodos ─► 9 Reportes
 ```
 Arriba de la ventana está el **tramo activo**: todas las pestañas trabajan con el tramo elegido.
 
@@ -66,7 +66,16 @@ contra la que se valida y aparecen en el reporte.
    tramos. Un valor **n/d** significa «no hay casos para calcularlo» (nunca 0). Con **n < 5** el intervalo no es fiable.
    Las pruebas avanzadas (McNemar, Bland-Altman, correlaciones…) están ocultas; se muestran con la casilla de arriba.
 
-### 8 · Reportes (pestaña *Reportes*)
+### 8 · Comparar métodos (pestaña *Métodos*)
+1. Asigne el rol **prueba** a las ROI con referencia de campo (pestaña *Análisis*) y cargue su ficha/referencia.
+2. En *Métodos* deje A = `actual` y B = `sun` y pulse **Analizar y validar con ambos**: se analizan las mismas ROI con los mismos parámetros y se validan.
+   Puede **Cancelar**; lo ya hecho queda guardado. **Comparar lo ya validado** no vuelve a analizar.
+3. Lea las tablas (métricas por método y tipo; tiempo y RAM) y la **conclusión**, que solo repite cifras calculadas. `sun` detecta únicamente grietas
+   lineales, por eso se compara en longitudinal y transversal.
+4. Con pocas unidades (< 10) la prueba McNemar no permite concluir; el texto lo avisa. Todo sale **PROVISIONAL** hasta calibrar con T1–T3.
+5. En *Reportes* los PDF/Excel incluyen la comparación cuando ambos métodos están validados.
+
+### 9 · Reportes (pestaña *Reportes*)
 **Reporte del tramo activo**
 1. Marque los formatos: **PDF** (informe completo), **Excel** (una hoja por tabla, con filtros) y/o **CSV** (detecciones y
    validación). Escriba, si quiere, título, autor e institución para la portada.

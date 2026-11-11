@@ -1,4 +1,4 @@
-# Guía de arquitectura (estado: Fase 6)
+# Guía de arquitectura (estado: Fase 7)
 
 Regla de capas del proyecto completo: `ui → logica_* → modelos/basedatos`; el **núcleo** (`app/nucleo/`) no conoce
 la BD ni la UI. Las vistas nunca importan modelos ni `nueva_sesion`; solo llaman a `logica_*`.
@@ -34,8 +34,8 @@ region ─► teselas (núcleo) ─► por cada una: leer ventana con margen
 Solo hay una ventana en memoria a la vez: el pico de RAM no depende de la longitud del ortomosaico.
 El margen (1 m) da contexto al procesamiento pero **no se mide**: así las teselas no se solapan.
 
-## Contrato de un método de detección (para 'sun', F7)
-`f(rgb, valido, params, eje, origen, nucleo=None) -> list[Deteccion]`, con coordenadas globales (`origen` es la
+## Contrato de un método de detección ('actual' y 'sun')
+`f(rgb, valido, params, eje, origen, nucleo=None[, contexto]) -> list[Deteccion]`, con coordenadas globales (`origen` es la
 esquina de la ventana) y medición solo dentro de `nucleo`. Se registra con `pipeline.registrar_metodo(nombre, f)`.
 
 ## Cambios respecto al plan de la F1 (y por qué)
@@ -158,5 +158,28 @@ UI (principal)  sondear(): progreso · resultado (antes/después) ─► el usua
 ## Cambios respecto al plan de la F1 (F6)
 - Corrección de la F5: leyenda de la gráfica de métricas (ver README). El núcleo no cambió.
 
+## Método 'sun' y comparación de métodos (F7)
+- **`nucleo/sun.py`**: realce → manta de cobertura 3×3 (k por mínimos cuadrados, escalas 2–9) → T = fix(α·kmin + β) → cierre → limpieza de ruido →
+  conexión de rupturas (reescrita) → esqueleto → `grietas.analizar_grietas` (medidas, ancho, eje, severidad: las mismas columnas que 'actual').
+- **Contrato de preparación** (`pipeline.PREPARACIONES`, `registrar_metodo(nombre, f, preparacion=Clase, tipos=...)`): un método puede pedir
+  pasadas previas sobre las teselas (`etapas`, `acumular(etapa, rgb, valido, origen, nucleo)`, `cerrar(etapa)`, `contexto`). 'sun' usa dos:
+  media de la calzada y `kmin`. El `contexto` global se entrega a cada tesela, así el resultado **no depende del tamaño de tesela**
+  (bloques anclados a múltiplos globales de 3, solo bloques 100 % válidos, la esquina decide a qué tesela pertenece). 'actual' no tiene preparación.
+- **`Params` v2**: `VERSION_PARAMS = 2` añade `sun_*`. `Params.desde_dict` lee v1 sin tocar (conserva `version=1` y su huella); `migrar()` produce v2.
+  `huella_nucleo()` excluye los `sun_*`: así la calibración de 'actual' sigue siendo válida y la comparación puede verificar que los Params base son los mismos.
+  `cfg.es_provisional(params, metodo)`: 'sun' es siempre PROVISIONAL.
+- **`logica_comparacion.py`**: `ejecutar_y_validar` (síncrono, para scripts), `comparar_metodos` (lee solo ejecuciones validadas con el mismo rol; métricas F5
+  por método y tipo, McNemar por unidad ROI×tipo, diferencias de medida con Bland-Altman, rendimiento), `conclusiones` (plantillas con cifras calculadas).
+- **Rendimiento**: `rendimiento.MedidorPico` muestrea el RSS; `logica_deteccion` guarda duración, pico y RAM adicional en la tabla nueva
+  `rendimiento_ejecucion` (`create_all` la agrega; la versión del esquema de BD sigue en 1; las ejecuciones antiguas no tienen fila).
+- **UI**: `ui/vista_comparacion.py` → `ui/presentadores/p_comparacion.py` → `logica_*`. El hilo de cálculo solo corre el núcleo; guardar, validar y comparar
+  ocurren en `sondear()` (hilo principal).
+- **Reportes**: `recopilar(..., con_metodos=True)` añade `comparacion_metodos`; `reportes_tablas` define las 4 tablas; PDF y XLSX solo las escriben.
+- **Decisión de `kmin` por región**: ver README (supuestos F7).
+
+## Cambios respecto al plan de la F1 (F7)
+- Se amplió el contrato de métodos con la preparación global (necesaria para que un umbral dependiente de toda la imagen no dependa de la tesela).
+- Tests previos actualizados por motivos justificados: 'sun' ya no es «no disponible» y `params_version` pasó a 2.
+
 ## Pendiente
-Método `sun.py` y su comparación (F7).
+Nada de código previsto. Ver `CHECKLIST_TESIS.md` (recalibración con T1–T3 y decisiones abiertas).

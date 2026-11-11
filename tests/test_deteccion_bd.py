@@ -47,7 +47,7 @@ def test_ejecucion_es_reproducible_y_marca_provisional_y_calidad(con_rois):
     assert e["provisional"] is True and e["preprocesamiento"] == "Sí" and e["metodo"] == "actual"
     assert e["calidad"] == "Adecuada" and e["resolucion_cm_px"] == pytest.approx(0.5) and e["duracion_s"] >= 0
     p = ld.parametros_de_ejecucion(e["id"])
-    assert p == base.con(gsd_cm=0.5) and p.huella() == e["params_huella"] and e["params_version"] == 1
+    assert p == base.con(gsd_cm=0.5) and p.huella() == e["params_huella"] and e["params_version"] == 2   # F7: esquema v2
     # tras cambiar la configuración, la ejecución vieja conserva sus parámetros
     cfg.guardar_params_base(Params().con(grieta_k_mad=3.0), calibrado=True)
     e2 = ld.analizar(con_rois, roi_id=roi["id"])
@@ -101,7 +101,7 @@ def test_patron_de_hilos_calcula_en_hilo_y_guarda_en_el_principal(con_rois):
 
 def test_errores_de_preparacion(tramo, bd):
     with pytest.raises(ErrorValidacion, match="no disponible"):
-        ld.preparar_analisis(tramo, metodo="sun")
+        ld.preparar_analisis(tramo, metodo="inexistente")
     lt.crear_tramo({"codigo": "T3"})
     with pytest.raises(ErrorValidacion, match="sin ortomosaico|no tiene ortomosaico"):
         ld.preparar_analisis("T3")

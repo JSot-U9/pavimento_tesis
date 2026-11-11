@@ -330,6 +330,34 @@ def _s6(d, st):
     if d["comparacion"] and filas_tabla(d, "comparacion_tramos"):
         el += [Paragraph(_t(TITULOS["comparacion_tramos"] + " (descriptiva, sin inferencia)"), st["h2"]),
                *_tabla(d, "comparacion_tramos", st)[0]]
+    if d.get("comparacion_metodos"):
+        el += _metodos(d, st)
+    return el
+
+
+def _metodos(d, st):
+    c = d["comparacion_metodos"]
+    a, b = c["metodos"]
+    el = [Paragraph(_t(f"Comparación de métodos: «{a}» (A) vs «{b}» (B)"), st["h2"])]
+    if c["provisional"]:
+        el.append(Paragraph(_t(c["conclusiones"][0]), st["prov"]))
+    el.append(Paragraph(_t(f"{c['n_unidades']} unidades (ROI × tipo) de {len(c['rois'])} ROI de {c['rol']}; tipos "
+                           f"comparables: {', '.join(c['tipos'])}. Mismos Params base: "
+                           f"{'sí' if c['mismos_params_base'] else 'NO'}."), st["peq"]))
+    el += [Paragraph(_t(TITULOS["metodos_metricas"]), st["h3"] if "h3" in st else st["h2"]),
+           *_tabla(d, "metodos_metricas", st, anchos=[14, 24, 7, 7, 7, 7, 15, 17, 14, 9, 17, 11])[0],
+           Spacer(1, 2 * mm), Paragraph(_t(TITULOS["metodos_mcnemar"]), st["peq"]),
+           *_tabla(d, "metodos_mcnemar", st)[0]]
+    if filas_tabla(d, "metodos_medidas"):
+        el += [Spacer(1, 2 * mm), Paragraph(_t(TITULOS["metodos_medidas"]), st["peq"]),
+               *_tabla(d, "metodos_medidas", st)[0]]
+        for var, nom, u in (("longitud_m", "Longitud", "m"), ("ancho_mm", "Ancho", "mm"), ("area_m2", "Área", "m²")):
+            ba = c["medidas"]["global"][var].get("bland_altman")
+            if ba:
+                el.append(_fig(graficos.fig_bland_altman(ba, f"Bland-Altman entre métodos · {nom} (B − A)", u,
+                                                         c["provisional"]), 105))
+    el += [Spacer(1, 2 * mm), Paragraph(_t(TITULOS["metodos_rendimiento"]), st["peq"]),
+           *_tabla(d, "metodos_rendimiento", st)[0]]
     return el
 
 

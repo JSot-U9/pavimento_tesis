@@ -36,7 +36,7 @@ def v(tmp_path):
 
 
 def test_abre_con_tramo_activo_y_formulario_cargado(v):
-    assert [v.nb.tab(t, "text") for t in v.nb.tabs()] == ["Tramos", "Fichas", "Análisis", "Validación", "Estadística", "Reportes"]
+    assert [v.nb.tab(t, "text") for t in v.nb.tabs()] == ["Tramos", "Fichas", "Análisis", "Validación", "Estadística", "Métodos", "Reportes"]
     assert v.ctx.tramo_id is not None and v.combo.get().startswith("T1")
     assert v.v_tramos.form.leer()["codigo"] == "T1"                       # la ficha del tramo activo se muestra
     assert "2400 × 1400 px" in v.v_tramos.info_orto.cget("text")

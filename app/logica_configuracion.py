@@ -25,7 +25,8 @@ DEFAULTS = {
     "respaldos_a_conservar": 10,          # F6: cuántos respaldos automáticos se conservan
     "objetivo_calibracion": "f1",         # F5: 'f1' | 'kappa'
     "params_base": None,                  # dict de Params o None = valores de fábrica
-    "params_calibrados_huella": None,     # huella de los Params calibrados con ROI reales
+    "params_calibrados_huella": None,     # huella de los Params calibrados con ROI reales (método 'actual')
+    "params_calibrados_huella_sun": None, # F7: ídem para el método 'sun' (nadie la escribe aún: 'sun' es PROVISIONAL)
 }
 
 
@@ -99,12 +100,14 @@ def todas():
 
 def params_base():
     d = obtener("params_base")
-    return Params.desde_dict(d) if d else Params()
+    return Params.desde_dict(d).migrar() if d else Params()
 
 
-def _huella(p):
-    """Huella sin gsd_cm: la resolución es dato de cada tramo, no un umbral calibrado."""
-    return p.con(gsd_cm=Params().gsd_cm).huella()
+def _huella(p, metodo="actual"):
+    """Huella sin gsd_cm: la resolución es dato de cada tramo, no un umbral calibrado. Para 'actual' solo cuentan los
+    campos de la versión 1 (los `sun_*` no la invalidan); para 'sun', todos."""
+    q = p.con(gsd_cm=Params().gsd_cm)
+    return q.huella() if metodo == "sun" else q.huella_nucleo()
 
 
 def guardar_params_base(params, calibrado=False):
@@ -114,6 +117,9 @@ def guardar_params_base(params, calibrado=False):
     establecer("params_calibrados_huella", _huella(params) if calibrado else None)
 
 
-def es_provisional(params):
-    """True salvo que `params` sean exactamente los marcados como calibrados con datos reales."""
+def es_provisional(params, metodo="actual"):
+    """True salvo que `params` sean exactamente los marcados como calibrados con datos reales.
+    El método 'sun' siempre es PROVISIONAL mientras no se marque su calibración (`params_calibrados_huella_sun`)."""
+    if metodo == "sun":
+        return obtener("params_calibrados_huella_sun") != _huella(params, "sun")
     return obtener("params_calibrados_huella") != _huella(params)

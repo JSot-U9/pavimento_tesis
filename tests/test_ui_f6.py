@@ -298,4 +298,4 @@ def test_humo_el_menu_lleva_a_la_pestana_y_la_version_es_fase_6(v):
         v.acerca()
     finally:
         messagebox.showinfo = orig
-    assert "Fase 6 de 7" in textos[0]
+    assert "Fase 7 de 7" in textos[0]

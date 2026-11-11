@@ -73,8 +73,9 @@ def test_cancelar_detiene_entre_teselas():
 
 
 def test_metodo_desconocido_da_mensaje_claro(lector_ejemplo):
-    with pytest.raises(ValueError, match="'sun'.*Disponibles: actual"):
-        analizar_region(lector_ejemplo, (0, 0, 500, 500), Params(), metodo="sun")
+    # (F7: 'sun' ya existe; el ejemplo del mensaje pasa a ser un método inexistente)
+    with pytest.raises(ValueError, match="'otro'.*Disponibles: actual, sun"):
+        analizar_region(lector_ejemplo, (0, 0, 500, 500), Params(), metodo="otro")
 
 
 def test_registrar_metodo_nuevo(lector_ejemplo, monkeypatch):

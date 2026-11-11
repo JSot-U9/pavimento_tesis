@@ -72,6 +72,15 @@ DESCRIPCION_PARAMS = {
     "bache_solidez_min": "Bache: solidez mínima (0-1)",
     "bache_relacion_min": "Bache: relación mínima eje menor/mayor",
     "marca_vial_L": "Bache: luminosidad por encima de la cual es marca vial",
+    "sun_alfa": "Sun: T = alfa·kmin + beta (alfa; 0.2247 del código Matlab)",
+    "sun_beta": "Sun: T = alfa·kmin + beta (beta, niveles de gris)",
+    "sun_contraste_min": "Sun: tope del umbral = media − este contraste (niveles de gris; mejora sobre Sun)",
+    "sun_vecinos_superficie": "Sun: manta con vecinos de la imagen (0, Matlab) o de las superficies (1, texto)",
+    "sun_cierre_m": "Sun: radio del cierre morfológico (m)",
+    "sun_ruido_dist_m": "Sun: distancia de los 8 puntos de la limpieza de ruido (m)",
+    "sun_hueco_max_m": "Sun: hueco máximo que se puentea (m)",
+    "sun_hueco_lateral_m": "Sun: desviación lateral admitida del puente (m)",
+    "sun_componente_min_m": "Sun: tamaño mínimo de un componente del esqueleto (m)",
 }
 EDITABLES = tuple(f.name for f in dataclasses.fields(Params) if f.name not in ("version", "gsd_cm"))
 
@@ -165,7 +174,7 @@ class PresentadorAnalisis:
         return [n for n in EDITABLES if getattr(base, n) != getattr(self._params, n)]
 
     def es_provisional(self) -> bool:
-        return logica_configuracion.es_provisional(self.params_actuales())
+        return logica_configuracion.es_provisional(self.params_actuales(), self.metodo)
 
     def aviso_provisional(self) -> str:
         return AVISO_PROVISIONAL if self.es_provisional() else ""

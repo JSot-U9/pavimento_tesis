@@ -12,7 +12,13 @@ longitud del ortomosaico (criterio: 100 000 x 2 000 px sin superar ~2 GB).
 El método de detección es seleccionable: `METODOS` mapea un nombre a una función
     f(rgb, valido, params, eje, origen, nucleo=None) -> list[Deteccion]
 `nucleo` = (x0, y0, x1, y1) en coordenadas de la ventana: solo debe medirse dentro de él.
-'actual' (black-hat + MAD) está aquí; 'sun' se registrará desde sun.py (Fase 7).
+'actual' (black-hat + MAD) está aquí; 'sun' (Sun, 2009) se registra desde sun.py (Fase 7).
+
+Métodos con ESTADÍSTICOS GLOBALES (como 'sun', cuyo umbral depende del mínimo de k de toda la imagen) se registran
+con una `preparacion`: una clase con `etapas`, `acumular(etapa, rgb, valido, origen, nucleo)`, `cerrar(etapa)` y
+`contexto`. `analizar_region` recorre las teselas una vez por etapa ANTES de detectar y entrega el contexto al método
+(argumento `contexto`), de modo que el resultado no dependa del tamaño de tesela. Cuesta una relectura del ortomosaico
+por etapa; los métodos sin preparación (como 'actual') no pagan nada.
 
 El margen de contexto evita efectos de borde en el procesamiento (iluminación, black-hat), pero no
 se mide en él: así las teselas no se solapan y no hay conteo doble. Las grietas y zonas de piel de
@@ -51,19 +57,38 @@ def _metodo_actual(rgb, valido, p, eje, origen, nucleo=None):
 
 
 METODOS = {"actual": _metodo_actual}
+PREPARACIONES = {}          # nombre de método -> clase de preparación (estadísticos globales), opcional
+TIPOS_METODO = {}           # nombre de método -> tipos que sabe detectar (los no listados: todos)
 
 
-def registrar_metodo(nombre, funcion):
-    """Permite que otros módulos (sun.py) agreguen un método de detección seleccionable."""
+def tipos_del_metodo(nombre):
+    """Tipos de deterioro que detecta el método (para comparar métodos solo en lo que ambos cubren)."""
+    from app.nucleo.estructuras import TIPOS
+    return tuple(TIPOS_METODO.get(nombre, TIPOS))
+
+
+def registrar_metodo(nombre, funcion, preparacion=None, tipos=None):
+    """Permite que otros módulos (sun.py) agreguen un método de detección seleccionable.
+    `preparacion` (opcional): ver la descripción del módulo. `tipos` (opcional): tipos que detecta."""
     METODOS[nombre] = funcion
+    if tipos is not None:
+        TIPOS_METODO[nombre] = tuple(tipos)
+    if preparacion is not None:
+        PREPARACIONES[nombre] = preparacion
+    else:
+        PREPARACIONES.pop(nombre, None)
 
 
-def analizar_ventana(rgb, valido, p: Params, eje: EjeVia, origen=(0, 0), metodo="actual", nucleo=None):
+def analizar_ventana(rgb, valido, p: Params, eje: EjeVia, origen=(0, 0), metodo="actual", nucleo=None,
+                     contexto=None):
     """Detecta en UNA ventana ya cargada. `origen` = esquina (x, y) de la ventana en el ortomosaico;
-    `nucleo` = rectángulo (x0,y0,x1,y1) de la ventana donde se mide (por defecto, toda)."""
+    `nucleo` = rectángulo (x0,y0,x1,y1) de la ventana donde se mide (por defecto, toda).
+    `contexto`: estadísticos globales (solo métodos con preparación); sin él el método usa solo esta ventana."""
     if metodo not in METODOS:
         raise ValueError(f"Método de detección desconocido o aún no disponible: '{metodo}'. "
                          f"Disponibles: {', '.join(sorted(METODOS))}")
+    if metodo in PREPARACIONES:
+        return METODOS[metodo](rgb, valido, p, eje, origen, nucleo, contexto=contexto)
     return METODOS[metodo](rgb, valido, p, eje, origen, nucleo)
 
 
@@ -105,31 +130,66 @@ def analizar_region(lector, region, p: Params, eje: EjeVia = None, margen_m=1.0,
     total = len(xs) * len(ys)
     acum, detecciones, hechas = AcumuladorCalidad(), [], 0
 
+    def leer_tesela(tx, ty):
+        """Lee la ventana (núcleo + margen) y devuelve (rgb, nodata, valido, nodata_m, núcleo local, origen, límites)."""
+        tx1, ty1 = min(tx + tesela_px, rx1), min(ty + tesela_px, ry1)
+        wx0, wy0 = max(0, tx - margen), max(0, ty - margen)
+        wx1, wy1 = min(lector.ancho, tx1 + margen), min(lector.alto, ty1 + margen)
+        rgb, nodata = lector.leer(wx0, wy0, wx1, wy1)
+        via = None
+        if mascara_via is not None:
+            via = mascara_via.leer(wx0, wy0, wx1, wy1)[0][..., 0] > 127
+        valido, nodata_m = mascara_valida(rgb, p, nodata, via)
+        cy0, cx0 = ty - wy0, tx - wx0                            # núcleo dentro de la ventana
+        nucleo = (cx0, cy0, cx0 + (tx1 - tx), cy0 + (ty1 - ty))
+        return rgb, nodata, valido, nodata_m, nucleo, (wx0, wy0), (tx1, ty1)
+
+    contexto = None
+    if metodo in PREPARACIONES:
+        # pasadas previas: estadísticos globales de la región (p. ej. kmin de 'sun'); no dependen de la tesela
+        prep = PREPARACIONES[metodo](p)
+        pasos = prep.etapas * total
+        previas = 0
+        for etapa in range(1, prep.etapas + 1):
+            for ty in ys:
+                for tx in xs:
+                    if cancelar is not None and cancelar.is_set():
+                        raise AnalisisCancelado("Análisis cancelado por el usuario")
+                    rgb, nodata, valido, nodata_m, nucleo, origen, _ = leer_tesela(tx, ty)
+                    if valido.sum() >= 100:
+                        prep.acumular(etapa, rgb, valido, origen, nucleo)
+                    del rgb, nodata, valido, nodata_m
+                    previas += 1
+                    if progreso is not None:
+                        progreso(previas / pasos * 0.5, f"preparación {etapa}/{prep.etapas}: tesela {previas - (etapa - 1) * total}/{total}")
+            prep.cerrar(etapa)
+        contexto = prep.contexto
+        if contexto is not None and contexto.get("advertencia"):
+            advertencias.append(contexto["advertencia"])
+        if contexto is None:
+            advertencias.append(f"método '{metodo}': no hay calzada válida suficiente para calcular sus estadísticos "
+                                f"globales; no se detectó nada")
+
     for ty in ys:
         for tx in xs:
             if cancelar is not None and cancelar.is_set():
                 raise AnalisisCancelado("Análisis cancelado por el usuario")
-            tx1, ty1 = min(tx + tesela_px, rx1), min(ty + tesela_px, ry1)
-            wx0, wy0 = max(0, tx - margen), max(0, ty - margen)
-            wx1, wy1 = min(lector.ancho, tx1 + margen), min(lector.alto, ty1 + margen)
-            rgb, nodata = lector.leer(wx0, wy0, wx1, wy1)
-            via = None
-            if mascara_via is not None:
-                via = mascara_via.leer(wx0, wy0, wx1, wy1)[0][..., 0] > 127
-            valido, nodata_m = mascara_valida(rgb, p, nodata, via)
-            cy0, cx0 = ty - wy0, tx - wx0                        # núcleo dentro de la ventana
-            sl = (slice(cy0, cy0 + (ty1 - ty)), slice(cx0, cx0 + (tx1 - tx)))
+            rgb, nodata, valido, nodata_m, nucleo, origen, (tx1, ty1) = leer_tesela(tx, ty)
+            cx0, cy0, cx1, cy1 = nucleo
+            sl = (slice(cy0, cy1), slice(cx0, cx1))
             acum.agregar(rgb[sl], valido[sl], nodata_m[sl])
-            if valido.sum() >= 100:
-                nucleo = (cx0, cy0, cx0 + (tx1 - tx), cy0 + (ty1 - ty))
-                for d in analizar_ventana(rgb, valido, p, eje, (wx0, wy0), metodo, nucleo):
+            if valido.sum() >= 100 and (contexto is not None or metodo not in PREPARACIONES):
+                for d in analizar_ventana(rgb, valido, p, eje, origen, metodo, nucleo, contexto):
                     if tx <= d.cx < tx1 and ty <= d.cy < ty1:
                         marcar_bordes(d, (tx, ty, tx1, ty1), (rx0, ry0, rx1, ry1))
                         detecciones.append(d)
-            del rgb, nodata, valido, nodata_m, via
+            del rgb, nodata, valido, nodata_m
             hechas += 1
             if progreso is not None:
-                progreso(hechas / total, f"tesela {hechas}/{total}")
+                if metodo in PREPARACIONES:
+                    progreso(0.5 + 0.5 * hechas / total, f"tesela {hechas}/{total}")
+                else:
+                    progreso(hechas / total, f"tesela {hechas}/{total}")
 
     detecciones = fusionar(detecciones, p, eje)
     _completar_posicion(detecciones, eje, p)
@@ -144,3 +204,9 @@ def _completar_posicion(detecciones, eje, p):
         d.area_px = int(round(d.area_m2 / p.gsd_m ** 2))
         d.progresiva_m = round(eje.progresiva_m(d.cx, d.cy), 2)
         d.lado_via = eje.lado_via(d.cx, d.cy)
+
+
+# 'sun' (Fase 7) se registra aquí, al final, para que `METODOS` ya exista cuando sun.py lo necesite.
+from app.nucleo import sun as _sun          # noqa: E402
+
+_sun.registrar()

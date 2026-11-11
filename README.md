@@ -7,7 +7,9 @@ altoandinas mediante bandas RGB y procesamiento en Python* (UNSAAC, Cusco, 2026)
 > programa es solo orientativa. Los umbrales calibrados con imágenes sintéticas son **provisionales**
 > (ver `Params.provisionales()`): deben recalibrarse con los ortomosaicos reales antes de usarlos como evidencia.
 
-## Estado: Fase 6 de 7 (reportes, exportación a QGIS y pulido)
+## Estado: Fase 7 de 7 (algoritmo de Sun y comparación de métodos) — proyecto completo
+
+Al final: **`CHECKLIST_TESIS.md`** (evidencia por módulo y objetivo, qué recalibrar con T1–T3, decisiones pendientes).
 
 | Fase | Contenido | Estado |
 |---|---|---|
@@ -16,10 +18,10 @@ altoandinas mediante bandas RGB y procesamiento en Python* (UNSAAC, Cusco, 2026)
 | F3 | Modelos de BD, `logica_*` de tramos/fichas/ROI/detección, importadores CSV/GeoJSON/GPKG | hecha |
 | F4 | UI Tkinter/ttk + visor por ventanas + procesamiento en segundo plano | hecha |
 | F5 | Validación (VP/FP/FN/VN), calibración de umbrales, estadística comparativa, gráficos | hecha |
-| **F6** | **Reportes PDF/XLSX/CSV, exportación a QGIS (GPKG/GeoJSON), respaldo, registro, empaquetado, manual** | **hecha (este código)** |
-| F7 | Algoritmo de Sun y comparación de métodos | pendiente |
+| F6 | Reportes PDF/XLSX/CSV, exportación a QGIS (GPKG/GeoJSON), respaldo, registro, empaquetado, manual | hecha |
+| **F7** | **Método 'sun' (Sun, 2009), comparación 'actual' vs 'sun' (pestaña Métodos + reportes), medición de tiempo y RAM** | **hecha (este código)** |
 
-Ya existen `main.py`, la interfaz (`app/ui/`), `app/tareas.py`, `logica_validacion`, `logica_calibracion`, `logica_estadistica` y `graficos`. Desde la F6 también hay reportes, exportación a QGIS, respaldo y `MANUAL.md`. **Todavía no hay** el método 'sun' (F7).
+Ya existen `main.py`, la interfaz (`app/ui/`), `app/tareas.py`, `logica_validacion`, `logica_calibracion`, `logica_estadistica` y `graficos`. Desde la F6 también hay reportes, exportación a QGIS, respaldo y `MANUAL.md`. Desde la F7 existe el método **'sun'** (`app/nucleo/sun.py`), `logica_comparacion.py`, la pestaña **Métodos** y `scripts/comparar_rendimiento.py`.
 
 ## Instalación y pruebas
 
@@ -27,7 +29,8 @@ Ya existen `main.py`, la interfaz (`app/ui/`), `app/tareas.py`, `logica_validaci
 pip install -r requirements.txt
 pytest                 # 259 con pantalla; sin pantalla se omiten 10 (las de widgets con Tk). ~1 min
 xvfb-run -a pytest     # Linux sin pantalla: ejecuta también las 10 pruebas de widgets
-pytest -m lento        # además: vía de 100 000 x 2 000 px (~1 min), mide el pico de RAM
+pytest -m lento        # además: vía de 100 000 x 2 000 px con ambos métodos (~3 min), mide el pico de RAM
+python -m scripts.comparar_rendimiento   # tiempo y RAM de 'actual' y 'sun', cada uno en un proceso aparte
 python main.py [--bd RUTA]               # abre la aplicación (BD: --bd > $PAVIMENTO_BD > ./datos/pavimento.db)
 xvfb-run -a -s "-screen 0 1440x900x24" python scripts/captura_pantallas.py   # recorre la UI y guarda capturas/ (requiere Pillow)
 ```
@@ -124,7 +127,7 @@ print(res.calidad)
 ```
 
 `analizar_region` acepta un ROI (`(x0, y0, x1, y1)`) o el ortomosaico completo, un `threading.Event` para
-cancelar y un `metodo` ('actual'; 'sun' llegará en la F7).
+cancelar y un `metodo` ('actual' o 'sun').
 
 ## Uso de la capa de datos (F3)
 
@@ -223,6 +226,40 @@ Flujo completo en `MANUAL.md`; instalación y `.exe` en `INSTALACION.md`. Pesta�
 (vista previa antes de generar), exportación a GeoPackage/GeoJSON para QGIS y respaldo/restauración de la base de datos.
 Los tres tramos de la tesis (≈ 1.2 km) se registran como **T1, T2 y T3**. Los **falsos positivos se excluyen del conteo** de las
 Tablas 2-4 pero siguen registrados en `Validacion` y en las detecciones (`incluida_en_conteo`, `estado_validacion`).
+
+## Uso del método 'sun' y de la comparación (F7)
+- En **Análisis** elija el método `sun` (o `actual`). Con `sun` el resultado sale siempre **PROVISIONAL** y solo reporta grietas
+  longitudinales/transversales (Sun no trata piel de cocodrilo ni baches).
+- Pestaña **Métodos**: «Analizar y validar con ambos» corre `actual` y `sun` sobre las **mismas ROI de prueba** con los **mismos Params base**,
+  valida cada uno contra la referencia de campo y compara. «Comparar lo ya validado» solo compara. La tabla muestra métricas por método y
+  tipo, tiempo (s y s/Mpx) y RAM; debajo, una conclusión **construida solo con las cifras** (nunca dice «mejor» sin mostrar el número).
+- Los reportes (PDF/XLSX) incluyen, si ambos métodos están validados, las hojas «Métodos Métricas / McNemar / Medidas / Rendimiento».
+- `python -m scripts.comparar_rendimiento [--ortomosaico T1.tif --gsd-cm 0.8 --region x0 y0 x1 y1]`: mide tiempo y pico de RAM con un proceso por método.
+- **Parámetros** (`Params`, versión 2): `sun_alfa=0.2247`, `sun_beta=40` (constantes del **código** Matlab; el texto de la tesis dice 0.22 y 45),
+  `sun_contraste_min`, `sun_vecinos_superficie` y cinco distancias `sun_*_m` derivadas del GSD. Todos PROVISIONALES.
+  Las ejecuciones guardadas con la versión 1 conservan su versión y su huella; se leen sin cambios.
+
+## Verificación de la F7
+| Criterio | Resultado |
+|---|---|
+| `pytest` completo | **417 pasan** con pantalla virtual (+ 2 `lento`: vía de 100 000 × 2 000 px con ambos métodos, ejecutadas aparte con los resultados de abajo) |
+| Contra una transliteración literal del Matlab y una referencia independiente (numpy puro) de la manta fractal | idénticos (`tests/test_sun.py`) |
+| Imágenes sintéticas con grietas de ancho/longitud conocidos | transversal 4.475 m (actual 4.487 m), longitudinal 5.517 m (actual 5.472 m) en el ejemplo sintético; anchos dentro de tolerancia |
+| `kmin` y media globales independientes del tamaño de tesela | igualdad exacta del contexto con teselas de 2400 a 512 px; detecciones dentro de tolerancia (las grietas que cruzan el borde de tesela pierden fragmentos < 15 cm, limitación previa del pipeline y común a ambos métodos) |
+| Memoria 100 000 × 2 000 px (200 Mpx), `tesela_px=2048` | **actual: 491 MB pico, 74 s; sun: 459 MB pico, 100 s**; ambos detectan las 10 grietas transversales de 20 mm (límite 2 048 MB) |
+| Comparación | misma referencia, mismos Params (misma huella), McNemar, Bland-Altman, rendimiento; `test_comparacion.py`, `test_ui_f7.py` |
+| Capas | `test_ui_capas.py` sigue en verde (vistas/presentadores no importan modelos ni sqlalchemy); la BD se escribe solo en el hilo principal |
+
+## Supuestos y límites conocidos (F7)
+- **Supuesto:** las distancias de Sun en píxeles (5, 2, 6, 4, 30 px) se pasaron a metros asumiendo imágenes de ≈ 0.8 cm/px (`sun_*_m`). Confirmar con la resolución de las imágenes de Sun / con su GSD real.
+- **Constantes del código, no del texto:** 0.2247 y 40 (decisión del tesista). Son PROVISIONALES hasta calibrarlas con T1–T3.
+- **Relleno de ceros** fuera del bloque 3×3 (fiel al Matlab): k crece con el nivel de gris y T ≈ 0.9 × (tono más oscuro) + 40.
+- **Mejora no pedida por Sun (aceptada por el tesista):** tope `T ≤ media − sun_contraste_min`. Sin él, una ROI sin grietas se marcaba entera como grieta. Si actúa, se advierte. `sun_contraste_min=0` reproduce el comportamiento original.
+- **No se portaron los errores del Matlab** (limpieza de ruido que cruza `row(i)/col(j)`, `BW` sin definir, límites 425/480 y franjas de 40/20 px de imágenes de 480 px, 3 líneas de barrido): la conexión de rupturas se reescribió con tamaños derivados del GSD y sirve para cualquier orientación; la clasificación usa el eje de vía.
+- `kmin` se resuelve **por región analizada** (ROI, ventana o tramo), no por tesela; una ROI y el tramo completo pueden tener distinto `kmin` y por tanto distinto T.
+- 'sun' solo detecta grietas lineales: la comparación se restringe a los tipos comunes.
+- La **RAM** de la pestaña Métodos es el aumento del RSS del proceso durante el análisis: aproximada y sensible al orden de ejecución. La cifra rigurosa sale de `scripts.comparar_rendimiento`.
+- Con pocas unidades (< 10) McNemar tiene muy poca potencia y el texto lo dice; los datos siguen siendo sintéticos: **ninguna cifra de comparación es evidencia** hasta usar T1–T3.
 
 ## Verificación de la F6
 | Criterio | Resultado |

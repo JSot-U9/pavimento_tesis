@@ -318,6 +318,16 @@ class EjecucionAnalisis(Base):
     )
 
 
+class RendimientoEjecucion(Base):
+    """F7: RAM adicional medida durante una ejecución (el tiempo está en EjecucionAnalisis.duracion_s). Tabla aparte para
+    no alterar el esquema v1: `create_all` la agrega a las bases ya existentes."""
+    __tablename__ = "rendimiento_ejecucion"
+    ejecucion_id: Mapped[int] = mapped_column(ForeignKey("ejecucion_analisis.id", ondelete="CASCADE"), primary_key=True)
+    ram_base_mb: Mapped[Optional[float]] = mapped_column(Float)
+    ram_pico_mb: Mapped[Optional[float]] = mapped_column(Float)
+    ram_adicional_mb: Mapped[Optional[float]] = mapped_column(Float)
+
+
 class Deteccion(Base):
     __tablename__ = "deteccion"
     id: Mapped[int] = mapped_column(primary_key=True)

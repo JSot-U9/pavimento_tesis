@@ -202,7 +202,7 @@ def test_parametros_provisionales_y_validacion_conjunta(tramo, ctx):
     assert r.ok and p.params_actuales().grieta_k_mad == 5.5 and p.params_actuales().celdas_min == 6
     assert p.parametros_modificados() == ["grieta_k_mad", "celdas_min"]
     p.restablecer_parametros()
-    assert p.params_actuales() == Params() and "metodo" not in p.__dict__ or p.metodos_disponibles() == ["actual"]
+    assert p.params_actuales() == Params() and "metodo" not in p.__dict__ or p.metodos_disponibles() == ["actual", "sun"]   # F7
 
 
 def test_normalizar_region():

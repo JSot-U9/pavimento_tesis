@@ -96,6 +96,21 @@ COLUMNAS = {
                            ("n_detecciones", "Detecciones", "int"), ("long_media", "Longitud media (m)", "f2"),
                            ("ancho_media", "Ancho medio (mm)", "f1"), ("area_total_m2", "Área total (m²)", "f2"),
                            ("pct_area_afectada", "% área afectada", "f2")],
+    # F7: comparación de métodos ('actual' vs 'sun')
+    "metodos_metricas": [("metodo", "Método", "txt"), ("tipo", "Tipo", "txt"), ("vp", "VP", "int"), ("fp", "FP", "int"),
+                         ("fn", "FN", "int"), ("vn", "VN", "int"), ("sens", "Sensibilidad", "f2"),
+                         ("esp", "Especificidad", "f2"), ("prec", "Precisión", "f2"), ("f1", "F1", "f2"),
+                         ("concordancia_pct", "Concordancia (%)", "f1"), ("kappa", "Kappa", "f2")],
+    "metodos_mcnemar": [("tipo", "Tipo", "txt"), ("n", "Unidades", "int"), ("ambos_aciertan", "Ambos aciertan", "int"),
+                        ("solo_a", "Solo A acierta", "int"), ("solo_b", "Solo B acierta", "int"),
+                        ("ambos_fallan", "Ambos fallan", "int"), ("prueba", "Prueba", "txt"), ("p", "p", "f3")],
+    "metodos_medidas": [("variable", "Variable", "txt"), ("tipo", "Tipo", "txt"), ("n", "Pares", "int"),
+                        ("sesgo", "Sesgo (B − A)", "f3"), ("mae", "MAE", "f3"), ("rmse", "RMSE", "f3"),
+                        ("loa_inf", "Límite inf.", "f3"), ("loa_sup", "Límite sup.", "f3")],
+    "metodos_rendimiento": [("metodo", "Método", "txt"), ("n_ejecuciones", "Ejecuciones", "int"),
+                            ("segundos", "Tiempo (s)", "f2"), ("mpx", "Megapíxeles", "f2"),
+                            ("s_por_mpx", "s / Mpx", "f2"), ("ram_adicional_max_mb", "RAM adicional máx. (MB)", "f1"),
+                            ("ram_pico_max_mb", "RAM pico máx. (MB)", "f1")],
 }
 
 TITULOS = {"resumen_tipos": "Resumen por tipo de deterioro",
@@ -107,7 +122,11 @@ TITULOS = {"resumen_tipos": "Resumen por tipo de deterioro",
            "calidad": "Calidad de imagen por ejecución", "parametros": "Parámetros del motor usados",
            "tramo": "Ficha 1 · Datos del tramo", "vuelos": "Ficha 5 · Vuelo UAV", "condiciones": "Ficha 8 · Condiciones ambientales",
            "gcps": "Ficha 9 · Puntos de control (GCP)", "patologias": "Fichas 2-4 · Patologías, severidad y medidas de campo",
-           "comparacion_tramos": "Comparación descriptiva entre tramos"}
+           "comparacion_tramos": "Comparación descriptiva entre tramos",
+           "metodos_metricas": "Comparación de métodos · métricas (mismas ROI de prueba)",
+           "metodos_mcnemar": "Comparación de métodos · McNemar sobre la presencia (acierto = VP o VN)",
+           "metodos_medidas": "Comparación de métodos · diferencias de medidas (B − A)",
+           "metodos_rendimiento": "Comparación de métodos · tiempo de cómputo y RAM"}
 
 CAMPOS_TRAMO = (("codigo", "Código"), ("via", "Vía"), ("ruta", "Ruta"), ("ubicacion", "Ubicación"),
                 ("progresiva_ini_m", "Progresiva inicial (m)"), ("progresiva_fin_m", "Progresiva final (m)"),
@@ -155,6 +174,8 @@ def filas_tabla(datos, nombre):
         return [{k: (str(x) if hasattr(x, "isoformat") else x) for k, x in f.items()} for f in datos["fichas"]["patologias"]]
     if nombre == "comparacion_tramos":
         return filas_comparacion(datos)
+    if nombre.startswith("metodos_"):
+        return filas_metodos(datos, nombre)
     raise KeyError(nombre)
 
 
@@ -267,6 +288,46 @@ def filas_comparacion(datos):
              "n_detecciones": f["n_detecciones"], "long_media": f["longitud_m"]["media"],
              "ancho_media": f["ancho_mm"]["media"], "area_total_m2": f["area_total_m2"],
              "pct_area_afectada": f["pct_area_afectada"]} for f in comp["filas"]]
+
+
+def filas_metodos(datos, nombre):
+    """Filas de las tablas de la comparación de métodos (vacías si no hay comparación en `datos`)."""
+    c = datos.get("comparacion_metodos")
+    if not c:
+        return []
+    a, b = c["metodos"]
+    out = []
+    if nombre == "metodos_metricas":
+        for m in (a, b):
+            for t in list(c["tipos"]) + ["global"]:
+                x = c["metricas"][m]["global"] if t == "global" else c["metricas"][m]["por_tipo"][t]
+                ex = x["exactitud"]["valor"]
+                out.append({"metodo": m, "tipo": "Todos los comparables" if t == "global" else NOMBRE_TIPO[t],
+                            "vp": x["vp"], "fp": x["fp"], "fn": x["fn"], "vn": x["vn"],
+                            "sens": x["sensibilidad"]["valor"], "esp": x["especificidad"]["valor"],
+                            "prec": x["precision"]["valor"], "f1": x["f1"]["valor"],
+                            "concordancia_pct": None if ex is None else 100 * ex, "kappa": x["kappa"]["kappa"]})
+    elif nombre == "metodos_mcnemar":
+        for t in ["global"] + list(c["tipos"]):
+            x = c["mcnemar"]["global"] if t == "global" else c["mcnemar"]["por_tipo"][t]
+            out.append({"tipo": "Todos los comparables" if t == "global" else NOMBRE_TIPO[t], "n": x["n"],
+                        "ambos_aciertan": x["ambos_aciertan"], "solo_a": x["solo_a"], "solo_b": x["solo_b"],
+                        "ambos_fallan": x["ambos_fallan"], "prueba": x["metodo"] or "sin discordantes", "p": x["p"]})
+    elif nombre == "metodos_medidas":
+        for v, nom, u in (("longitud_m", "Longitud", "m"), ("ancho_mm", "Ancho", "mm"), ("area_m2", "Área", "m²")):
+            filas = [("Todos", c["medidas"]["global"][v])] + [
+                (NOMBRE_TIPO[t], c["medidas"]["por_tipo"][t][v]) for t in c["tipos"] if v in c["medidas"]["por_tipo"].get(t, {})]
+            for etq, e in filas:
+                if e["n"]:
+                    ba = e.get("bland_altman") or {}
+                    out.append({"variable": f"{nom} ({u})", "tipo": etq, "n": e["n"], "sesgo": e["sesgo"], "mae": e["mae"],
+                                "rmse": e["rmse"], "loa_inf": ba.get("loa_inf"), "loa_sup": ba.get("loa_sup")})
+    elif nombre == "metodos_rendimiento":
+        for m in (a, b):
+            out.append({"metodo": m, **{k: c["rendimiento"][m][k] for k in
+                                        ("n_ejecuciones", "segundos", "mpx", "s_por_mpx", "ram_adicional_max_mb",
+                                         "ram_pico_max_mb")}})
+    return out
 
 
 def columnas(datos, nombre):
