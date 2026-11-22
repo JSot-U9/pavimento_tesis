@@ -71,6 +71,7 @@ class Contexto:
 
     def __init__(self):
         self.tramo_id = None
+        self.modo_tutorial = False              # True mientras se trabaja en la BD de práctica del tutorial
         self._obs: Dict[str, List[Callable]] = defaultdict(list)
 
     def suscribir(self, evento: str, fn: Callable):

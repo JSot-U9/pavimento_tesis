@@ -1,0 +1,7 @@
+numpy
+opencv-python
+scipy
+scikit-image
+pandas
+# opcional: leer GSD y coordenadas de un GeoTIFF proyectado
+# rasterio

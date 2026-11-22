@@ -95,6 +95,7 @@ def aplicar(root: tk.Misc) -> ttk.Style:
     st.configure("Treeview", background="#ffffff", fieldbackground="#ffffff", rowheight=ALTO_FILA,
                  bordercolor=BORDE)
     st.map("Treeview", background=[("selected", ACENTO)], foreground=[("selected", "#ffffff")])
+    st.configure("Tutorial.Treeview", rowheight=19)
     st.configure("Treeview.Heading", background="#e5e7eb", font=(fam, 10, "bold"), padding=(6, 4), relief="flat")
     st.map("Treeview.Heading", background=[("active", "#d9dde3")])
 

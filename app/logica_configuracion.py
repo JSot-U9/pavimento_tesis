@@ -23,6 +23,7 @@ DEFAULTS = {
     "estadistica_avanzada": False,        # F5: mostrar McNemar, Bland-Altman, correlaciones, pruebas pareadas y IC bootstrap del F1
     "respaldo_automatico": True,          # F6: copia diaria de la BD al abrir el programa (carpeta «respaldos»)
     "respaldos_a_conservar": 10,          # F6: cuántos respaldos automáticos se conservan
+    "tutorial_no_preguntar": False,       # no ofrecer el tutorial al abrir el programa con la base de datos vacía
     "objetivo_calibracion": "f1",         # F5: 'f1' | 'kappa'
     "params_base": None,                  # dict de Params o None = valores de fábrica
     "params_calibrados_huella": None,     # huella de los Params calibrados con ROI reales (método 'actual')
@@ -58,7 +59,7 @@ def _validar(clave, valor):
             valor = int(valor)
             if not 1 <= valor <= 365:
                 raise ValueError("debe estar entre 1 y 365")
-        elif clave in ("estadistica_avanzada", "respaldo_automatico"):
+        elif clave in ("estadistica_avanzada", "respaldo_automatico", "tutorial_no_preguntar"):
             if isinstance(valor, str):
                 valor = valor.strip().lower() in ("1", "true", "si", "sí", "s", "yes")
             valor = bool(valor)

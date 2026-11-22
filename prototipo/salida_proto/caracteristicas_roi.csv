@@ -1,0 +1,6 @@
+﻿imagen,tramo,codigo_roi,tipo_campo,severidad_campo,x,y,ancho_px,alto_px,area_roi_m2,R_media,R_min,R_max,R_desv,G_media,G_min,G_max,G_desv,B_media,B_min,B_max,B_desv,tex_contraste,tex_homogeneidad,tex_correlacion,tex_energia,tex_disimilitud,tex_entropia,tipos_detectados,etiqueta_python,n_longitudinal,n_transversal,n_piel_cocodrilo,n_bache
+ortomosaico_sintetico.png,Tramo sintetico,R01,transversal,Baja,150,80,330,1000,8.25,114.32,29,136,10.75,112.0,27,133,10.68,108.52,24,129,10.57,0.61,0.835,0.8379,0.4228,0.364,3.089,transversal,transversal,0,1,0,0
+ortomosaico_sintetico.png,Tramo sintetico,R02,longitudinal,Baja,560,560,1200,300,9.0,120.86,46,140,8.24,118.41,43,137,8.2,114.74,40,133,8.14,0.591,0.8367,0.7397,0.5049,0.36,2.496,longitudinal,longitudinal,1,0,0,0
+ortomosaico_sintetico.png,Tramo sintetico,R03,piel_cocodrilo,Media,950,100,500,450,5.625,123.26,56,147,15.99,120.66,54,144,15.97,116.75,51,139,15.95,2.249,0.7401,0.7255,0.4236,0.75,3.547,piel_cocodrilo,piel_cocodrilo,0,0,1,0
+ortomosaico_sintetico.png,Tramo sintetico,R04,bache,Alta,1700,720,400,360,3.6,105.88,40,129,13.58,103.68,38,127,13.55,100.38,35,123,13.5,0.363,0.8366,0.9391,0.46,0.333,2.999,bache,bache,0,0,0,1
+ortomosaico_sintetico.png,Tramo sintetico,R05,sano,,1500,1050,500,300,3.75,107.84,88,126,4.54,105.68,86,123,4.45,102.43,83,119,4.31,0.323,0.8442,0.5973,0.5129,0.314,2.426,,sano,0,0,0,0

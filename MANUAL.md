@@ -11,6 +11,13 @@ flexibles de zonas altoandinas mediante bandas RGB y procesamiento en Python»**
 
 Los tres tramos de la tesis (≈ 1.2 km cada uno) se registran con los códigos **T1, T2 y T3**.
 
+## Si es la primera vez: use el tutorial
+
+Botón **Tutorial (F1)** arriba a la derecha (o la tecla F1, o el menú **Ayuda ▸ Tutorial guiado…**; también `tutorial.bat` en Windows
+y `./tutorial.sh` en Linux/macOS). Si abre el programa con la base de datos vacía, se lo ofrece solo. Un panel a la derecha le explica cada paso
+con un ejemplo sintético y puede hacerlo por usted con **«Hacerlo por mí»**. Usa una base de datos de práctica: sus datos reales no
+se tocan; **«Salir del tutorial»** vuelve a ellos. Cuando termine, cree su propio tramo con los pasos de abajo.
+
 ## El flujo completo
 
 ```

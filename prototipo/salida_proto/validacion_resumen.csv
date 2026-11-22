@@ -1,0 +1,6 @@
+﻿tipo,VP,FP,FN,VN,precision,sensibilidad,F1,concordancia_pct,kappa_cohen,exactitud_etiqueta_pct
+longitudinal,1,0,0,4,1.0,1.0,1.0,100.0,,
+transversal,1,0,0,4,1.0,1.0,1.0,100.0,,
+piel_cocodrilo,1,0,0,4,1.0,1.0,1.0,100.0,,
+bache,1,0,0,4,1.0,1.0,1.0,100.0,,
+GLOBAL,4,0,0,16,1.0,1.0,1.0,100.0,1.0,100.0

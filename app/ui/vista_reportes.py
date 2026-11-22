@@ -114,8 +114,8 @@ class VistaReportes(ttk.Frame):
         dlg = DialogoVistaPrevia(self, r.datos["texto"], d["conclusiones"], d["advertencias"], fm)
         return dlg.abrir()
 
-    def generar(self):
-        if self.vista_previa() is not True:
+    def generar(self, con_vista_previa=True):
+        if con_vista_previa and self.vista_previa() is not True:
             return
         r = self.pres.iniciar(self.ctx.tramo_id, self._opciones(), self.v_carpeta.get())
         if not r.ok:

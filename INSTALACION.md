@@ -27,6 +27,10 @@ internet. Hay dos formas de instalarla: **desde el código** (recomendada mientr
 5. **Abra el programa**: `python main.py` (o `python main.py --bd D:\tesis\pavimento.db` para elegir dónde queda la base
    de datos).
 
+Para ver cómo funciona antes de usar sus datos: haga doble clic en `tutorial.bat` (Windows) o ejecute `./tutorial.sh`
+(Linux/macOS); equivale a `python main.py --tutorial`. También se abre dentro del programa con el botón «Tutorial (F1)». Es un
+tutorial guiado con datos de ejemplo (carpeta `ejemplo/`) y no toca su base de datos real.
+
 En Linux: `sudo apt install python3-tk` y los mismos pasos con `source .venv/bin/activate`.
 
 ## B. Programa empaquetado (`.exe`) con PyInstaller

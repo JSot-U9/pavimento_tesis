@@ -1,0 +1,5 @@
+﻿id_deterioro,imagen,tramo,origen,codigo_roi,tipo,longitud_m,ancho_mm,area_m2,desv_eje_deg,angulo_img_deg,contraste_weber,ramificada,n_celdas,celda_media_m2,densidad_grietas,solidez,severidad_prelim,advertencia,x,y,w,h,cx,cy
+ortomosaico_sintetico_0001,ortomosaico_sintetico.png,Tramo sintetico,roi,R01,transversal,4.487,40.0,0.17957,89.7,90.3,0.605,False,,,,,Media,,296,118,15,883,302.6024915062288,559.0
+ortomosaico_sintetico_0002,ortomosaico_sintetico.png,Tramo sintetico,roi,R02,longitudinal,5.477,31.0,0.16984,0.5,0.5,0.537,False,,,,,Media,,622,690,1079,17,1161.0,697.9017608897127
+ortomosaico_sintetico_0003,ortomosaico_sintetico.png,Tramo sintetico,roi,R03,piel_cocodrilo,1.865,1695.0,2.3982,,,,,88.0,0.0205,0.246,,Media,,1019,159,373,339,1205.5,328.5
+ortomosaico_sintetico_0004,ortomosaico_sintetico.png,Tramo sintetico,roi,R04,bache,0.706,510.8,0.2835,,,,,,,,0.99,requiere profundidad de campo,"revisar sombras, agua o reparaciones",1830,848,140,106,1900.0,901.0

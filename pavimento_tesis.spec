@@ -17,6 +17,7 @@ datos = []
 datos += collect_data_files("matplotlib")                      # fuentes y estilos de matplotlib
 datos += collect_data_files("reportlab")                       # fuentes estándar y plantillas de reportlab
 datos += collect_data_files("skimage")
+datos += [("ejemplo", "ejemplo")]                              # ejemplo sintético del tutorial (imagen, ROI y eje)
 ocultos = []
 ocultos += collect_submodules("sqlalchemy.dialects.sqlite")    # el dialecto se carga por nombre
 ocultos += collect_submodules("skimage.morphology") + collect_submodules("skimage.measure")

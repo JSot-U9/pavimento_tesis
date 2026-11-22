@@ -1,0 +1,6 @@
+codigo_roi,tramo,tipo_campo,severidad_campo,x,y,ancho,alto,imagen
+R01,Tramo sintetico,transversal,Baja,150,80,330,1000,ortomosaico_sintetico.png
+R02,Tramo sintetico,longitudinal,Baja,560,560,1200,300,ortomosaico_sintetico.png
+R03,Tramo sintetico,piel de cocodrilo,Media,950,100,500,450,ortomosaico_sintetico.png
+R04,Tramo sintetico,bache,Alta,1700,720,400,360,ortomosaico_sintetico.png
+R05,Tramo sintetico,sano,,1500,1050,500,300,ortomosaico_sintetico.png

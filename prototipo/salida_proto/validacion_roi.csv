@@ -1,0 +1,6 @@
+﻿imagen,codigo_roi,tipo_campo,etiqueta_python,tipos_detectados,coincide
+ortomosaico_sintetico.png,R01,transversal,transversal,transversal,True
+ortomosaico_sintetico.png,R02,longitudinal,longitudinal,longitudinal,True
+ortomosaico_sintetico.png,R03,piel_cocodrilo,piel_cocodrilo,piel_cocodrilo,True
+ortomosaico_sintetico.png,R04,bache,bache,bache,True
+ortomosaico_sintetico.png,R05,sano,sano,,True

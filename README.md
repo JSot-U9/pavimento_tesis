@@ -23,11 +23,45 @@ Al final: **`CHECKLIST_TESIS.md`** (evidencia por módulo y objetivo, qué recal
 
 Ya existen `main.py`, la interfaz (`app/ui/`), `app/tareas.py`, `logica_validacion`, `logica_calibracion`, `logica_estadistica` y `graficos`. Desde la F6 también hay reportes, exportación a QGIS, respaldo y `MANUAL.md`. Desde la F7 existe el método **'sun'** (`app/nucleo/sun.py`), `logica_comparacion.py`, la pestaña **Métodos** y `scripts/comparar_rendimiento.py`.
 
+## Modo tutorial (para usuarios nuevos)
+
+El programa trae un **tutorial guiado dentro de la aplicación**, basado en el ejemplo sintético (imagen de 12 m con una grieta
+transversal, una longitudinal, piel de cocodrilo, un bache y un trozo sano). Todo lo que necesita viaja con el proyecto.
+
+**Cómo abrirlo (siempre disponible):**
+- botón **Tutorial (F1)** arriba a la derecha de la ventana, o la tecla **F1**, o menú **Ayuda ▸ Tutorial guiado…**;
+- al **abrir el programa con la base de datos vacía** se ofrece solo («Empezar», «Ahora no», «No volver a preguntar»); en la
+  pestaña Tramos, mientras no haya tramos, un aviso recuerda dónde está;
+- sin abrir el programa antes: **`tutorial.bat`** (Windows) · **`./tutorial.sh`** (Linux/macOS) · `python main.py --tutorial`.
+
+**Qué hace:** un panel a la derecha recorre 13 pasos (tramo → ortomosaico → eje → ROI → roles → análisis → resultados →
+validación → estadística → métodos → reportes). Cada paso explica **qué es**, **cómo hacerlo** y **qué debería ver**; se puede
+hacer a mano o con **«Hacerlo por mí»** (el programa maneja las pestañas reales). El avance se reconoce mirando la base de
+datos, así que funciona igual si el paso se hizo a mano. Trabaja en una **base de datos de práctica**
+(`<carpeta de la BD>/tutorial/`): **los datos reales no se tocan**. «Salir del tutorial» vuelve a la base real; «Reiniciar
+tutorial» borra la práctica y empieza de nuevo.
+
+**Archivos del proyecto que lo hacen posible:**
+
+| Ruta | Qué es |
+|---|---|
+| `ejemplo/` | Imagen sintética, `rois_ejemplo.csv` y `eje_ejemplo.csv` que usa el tutorial (ver `ejemplo/LEEME.md`). Si faltan, el programa los genera idénticos. |
+| `scripts/generar_ejemplo.py` | `python scripts/generar_ejemplo.py ejemplo` regenera el ejemplo. |
+| `prototipo/` | El prototipo original de un solo archivo (`pavimento_rgb.py`, `generar_ejemplo.py`, su salida y README), de donde salió el ejemplo. Solo referencia. |
+| `tutorial.bat`, `tutorial.sh` | Lanzadores directos del tutorial. |
+| `app/ejemplo_sintetico.py`, `app/logica_tutorial.py`, `app/ui/presentadores/p_tutorial.py`, `app/ui/panel_tutorial.py`, `app/ui/dialogo_tutorial.py` | Código. Pruebas: `tests/test_tutorial.py`. |
+
+El tutorial necesita una base de datos en archivo (no `:memory:`) para poder volver a ella al salir. El ejecutable de PyInstaller
+incluye `ejemplo/` (ver `pavimento_tesis.spec`).
+
+![Aviso de primera vez y botón Tutorial](capturas/tutorial_00_inicio.png)
+![Tutorial: paso de ROI](capturas/tutorial_02_paso_roi.png)
+
 ## Instalación y pruebas
 
 ```
 pip install -r requirements.txt
-pytest                 # 259 con pantalla; sin pantalla se omiten 10 (las de widgets con Tk). ~1 min
+pytest                 # 437 con pantalla (xvfb-run -a pytest en Linux sin pantalla); las de Tk se omiten solas. ~3 min
 xvfb-run -a pytest     # Linux sin pantalla: ejecuta también las 10 pruebas de widgets
 pytest -m lento        # además: vía de 100 000 x 2 000 px con ambos métodos (~3 min), mide el pico de RAM
 python -m scripts.comparar_rendimiento   # tiempo y RAM de 'actual' y 'sun', cada uno en un proceso aparte

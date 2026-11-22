@@ -181,5 +181,27 @@ UI (principal)  sondear(): progreso · resultado (antes/después) ─► el usua
 - Se amplió el contrato de métodos con la preparación global (necesaria para que un umbral dependiente de toda la imagen no dependa de la tesela).
 - Tests previos actualizados por motivos justificados: 'sun' ya no es «no disponible» y `params_version` pasó a 2.
 
+## Modo tutorial
+```
+ventana_principal.iniciar_tutorial ─► logica_tutorial.preparar(carpeta)   BD de práctica nueva + ejemplo_sintetico.generar
+                                  ─► abrir_bd(BD de práctica) ─► ctx.emitir("bd") ─► PanelTutorial(PresentadorTutorial)
+salir_tutorial ─► abrir_bd(BD real) ─► ctx.emitir("bd")                        (la BD real nunca se modifica)
+```
+| Módulo | Responsabilidad |
+|---|---|
+| `ejemplo_sintetico.py` | Genera el ortomosaico sintético (semilla fija), `rois_ejemplo.csv` y `eje_ejemplo.csv`; sin BD ni UI |
+| `logica_tutorial.py` | `PASOS` (qué es / cómo / qué ver), `carpeta_tutorial`, `preparar`, `estado_pasos()` (qué pasos están hechos, mirando la BD con `logica_*`) |
+| `ui/presentadores/p_tutorial.py` | Paso actual, pasos informativos vistos, bloqueo por pasos previos, `hacer()` (llama a la acción); sin Tk |
+| `ui/panel_tutorial.py` | Panel lateral: lista de pasos, texto, archivo de ejemplo, botones; sondea el avance cada ~0.9 s |
+| `ui/dialogo_tutorial.py` | Diálogo de oferta («Empezar», «Ahora no», «No volver a preguntar») |
+| `ui/ventana_principal.py` | Botón «Tutorial (F1)», tecla F1, `ofrecer_tutorial()` (main la programa si no hay `--tutorial`), menú Ayuda, cambio de BD, `_acciones_tutorial()`: manejan las vistas reales con las mismas funciones que sus botones |
+
+Oferta: `logica_tutorial.debe_ofrecer()` = BD sin tramos y `Configuracion['tutorial_no_preguntar']` falso. El ejemplo se copia de la carpeta
+`ejemplo/` del proyecto (`ejemplo_sintetico.carpeta_incluida()`; en el ejecutable, dentro del paquete) o se genera si falta;
+`tests/test_tutorial.py` comprueba que ambos son idénticos. `Contexto.modo_tutorial` oculta el aviso de «primera vez» mientras se practica.
+
+Reglas: el avance sale de la BD (no hay contador aparte), así que sirve igual si el usuario hizo el paso a mano; el tutorial solo
+funciona con una BD en archivo (para poder volver); `VistaReportes.generar(con_vista_previa=False)` permite al tutorial generar sin el diálogo.
+
 ## Pendiente
 Nada de código previsto. Ver `CHECKLIST_TESIS.md` (recalibración con T1–T3 y decisiones abiertas).

@@ -30,6 +30,8 @@ class VistaTramos(ttk.Frame):
         pan.pack(fill="both", expand=True)
         izq = ttk.Frame(pan, padding=(0, 0, 8, 0))
         ttk.Label(izq, text="Tramos", style="Titulo.TLabel").pack(anchor="w", pady=(0, 6))
+        self.aviso_primera_vez = Banner(izq)
+        self.aviso_primera_vez.ajustar_ancho(420)
         self.tabla = TablaTreeview(izq, COLUMNAS, altura=16, al_seleccionar=self._elegido)
         self.tabla.pack(fill="both", expand=True)
         b = ttk.Frame(izq)
@@ -85,6 +87,14 @@ class VistaTramos(ttk.Frame):
         r = self.pres.listar()
         filas = [(t["id"], self.pres.fila(t)) for t in (r.datos or [])]
         self.tabla.cargar(filas)
+        if not filas and not self.ctx.modo_tutorial:
+            self.aviso_primera_vez.mostrar(
+                "¿Primera vez? Pulse «Tutorial (F1)» (arriba a la derecha) o la tecla F1: un recorrido guiado con datos de "
+                "ejemplo que no toca sus datos.", "aviso")
+            self.aviso_primera_vez.pack(fill="x", pady=(0, 6), before=self.tabla)
+        else:
+            self.aviso_primera_vez.ocultar()
+            self.aviso_primera_vez.pack_forget()
         if self._id is not None and not any(i == self._id for i, _ in filas):
             self._id = None
         if self._id is None and self.ctx.tramo_id is not None and any(i == self.ctx.tramo_id for i, _ in filas):

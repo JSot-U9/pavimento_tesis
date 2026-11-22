@@ -276,6 +276,12 @@ def test_main_arranca_con_log_y_respaldo_automatico_y_cierra_la_bd(tmp_path, lim
         def __init__(self, ruta_bd, abrir_bd):
             llamadas["ruta"] = ruta_bd
 
+        def ofrecer_tutorial(self):
+            pass
+
+        def after(self, ms, fn):
+            llamadas["after"] = fn.__name__               # main programa la oferta del tutorial
+
         def mainloop(self):
             llamadas["loop"] = True
     monkeypatch.setattr(vp, "VentanaPrincipal", Falsa)
@@ -283,7 +289,8 @@ def test_main_arranca_con_log_y_respaldo_automatico_y_cierra_la_bd(tmp_path, lim
     monkeypatch.setattr(estilos, "hacer_dpi_consciente", lambda: None)
     bd = str(tmp_path / "d" / "p.db")
     assert main.main(["--bd", bd, "--log-dir", str(tmp_path / "logs"), "--verbose"]) == 0
-    assert llamadas["loop"] and os.path.exists(tmp_path / "logs" / "pavimento_tesis.log")
+    assert llamadas["loop"] and llamadas["after"] == "ofrecer_tutorial"
+    assert os.path.exists(tmp_path / "logs" / "pavimento_tesis.log")
     assert any(f.endswith("_automatico.db") for f in os.listdir(tmp_path / "d" / "respaldos"))
     assert basedatos.ruta_actual() is None                                    # BD cerrada al salir
 
