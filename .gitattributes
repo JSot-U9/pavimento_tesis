@@ -1,0 +1,3 @@
+# El tutorial compara estos archivos byte a byte: no convertir finales de línea.
+ejemplo/*.csv text eol=lf
+ejemplo/*.png binary

@@ -94,6 +94,9 @@ def test_dibujar_eje_en_el_visor_lo_guarda(v, monkeypatch):
     a.visor.fijar_modo("eje")
     for x, y in ((120, 200), (300, 230), (500, 210)):
         h.pulsar(a.visor.lienzo, x, y)
+    v.update()
+    a.visor.lienzo.focus_force()  # en Windows los eventos de teclado generados exigen foco real
+    v.update()
     a.visor.lienzo.event_generate("<Return>")
     v.update()
     e = lt.obtener_eje("T1")

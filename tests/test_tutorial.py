@@ -302,8 +302,8 @@ def test_la_carpeta_ejemplo_del_proyecto_es_identica_a_lo_que_genera_el_codigo(t
     assert inc is not None and os.path.samefile(inc, os.path.join(RAIZ, "ejemplo"))
     gen = ej.generar(str(tmp_path))
     for clave, nombre in (("ortomosaico", ej.NOMBRE_IMAGEN), ("rois", ej.NOMBRE_ROIS), ("eje", ej.NOMBRE_EJE)):
-        a = open(os.path.join(inc, nombre), "rb").read() if clave != "ortomosaico" else cv2.imread(os.path.join(inc, nombre)).tobytes()
-        b = open(gen[clave], "rb").read() if clave != "ortomosaico" else cv2.imread(gen[clave]).tobytes()
+        a = open(os.path.join(inc, nombre), "rb").read().replace(b"\r\n", b"\n") if clave != "ortomosaico" else cv2.imread(os.path.join(inc, nombre)).tobytes()
+        b = open(gen[clave], "rb").read().replace(b"\r\n", b"\n") if clave != "ortomosaico" else cv2.imread(gen[clave]).tobytes()
         assert a == b, nombre
 
 
